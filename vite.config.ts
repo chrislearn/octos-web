@@ -16,9 +16,8 @@ export default defineConfig({
     proxy: {
       "/api": {
         target: "http://localhost:9326",
-        headers: {
-          "X-Profile-Id": "dspfac",
-        },
+        changeOrigin: true,
+        ws: true,
       },
     },
   },
