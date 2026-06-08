@@ -21,7 +21,14 @@ import {
   vi,
 } from "vitest";
 
-import { publicRequest, request, getToken, setToken } from "@/api/client";
+import {
+  ensureSelectedProfileId,
+  extractProfileIdFromPayload,
+  publicRequest,
+  request,
+  getToken,
+  setToken,
+} from "@/api/client";
 import { TOKEN_KEY, ADMIN_TOKEN_KEY } from "@/lib/constants";
 
 // ---------------------------------------------------------------------------
@@ -100,11 +107,33 @@ function mockFetchStatus(status: number, body = ""): ReturnType<typeof vi.fn> {
   return fetchMock;
 }
 
+function installLocalStorageStub(): void {
+  const values = new Map<string, string>();
+  const storage = {
+    get length() {
+      return values.size;
+    },
+    clear: () => {
+      values.clear();
+    },
+    getItem: (key: string) => values.get(key) ?? null,
+    key: (index: number) => Array.from(values.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      values.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      values.set(key, String(value));
+    },
+  } satisfies Storage;
+  vi.stubGlobal("localStorage", storage);
+}
+
 // ---------------------------------------------------------------------------
 // Lifecycle
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
+  installLocalStorageStub();
   // Start every test signed in so the reaper has tokens to clear.
   localStorage.setItem(TOKEN_KEY, "session-token");
   localStorage.setItem(ADMIN_TOKEN_KEY, "admin-token");
@@ -353,6 +382,51 @@ describe("client.publicRequest — solo endpoints never reap tokens", () => {
     expect((caught as Error).message).toContain("404");
     expect(localStorage.getItem(TOKEN_KEY)).toBe("session-token");
     expect(hrefWrites.length).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Profile id extraction — solo/local profile shapes
+// ---------------------------------------------------------------------------
+
+describe("client profile id extraction", () => {
+  it("extracts profile.id from the flat /api/my/profile shape", () => {
+    expect(
+      extractProfileIdFromPayload({
+        profile: { id: "solo-local" },
+      }),
+    ).toBe("solo-local");
+  });
+
+  it("extracts profile.profile.id from the nested /api/auth/me shape", () => {
+    expect(
+      extractProfileIdFromPayload({
+        profile: { profile: { id: "solo-local" } },
+      }),
+    ).toBe("solo-local");
+  });
+
+  it("ensureSelectedProfileId stores a nested solo profile id returned by /api/my/profile", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          profile: { profile: { id: "solo-local" } },
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    localStorage.removeItem("selected_profile");
+
+    await expect(ensureSelectedProfileId()).resolves.toBe("solo-local");
+
+    expect(localStorage.getItem("selected_profile")).toBe("solo-local");
+    expect(fetchMock).toHaveBeenCalledWith("/api/my/profile", {
+      headers: { Authorization: "Bearer session-token" },
+    });
   });
 });
 

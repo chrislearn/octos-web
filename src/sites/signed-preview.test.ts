@@ -41,7 +41,7 @@ vi.mock("@/api/client", () => ({
   getSelectedProfileId: vi.fn(() => "tenant-a"),
 }));
 
-import { signPreview } from "./api";
+import { hydrateSiteProjectFromSession, signPreview } from "./api";
 
 describe("signPreview", () => {
   const originalFetch = globalThis.fetch;
@@ -127,5 +127,189 @@ describe("signPreview", () => {
         site_slug: "test-site",
       }),
     ).rejects.toThrow(/401/);
+  });
+});
+
+describe("hydrateSiteProjectFromSession", () => {
+  const originalFetch = globalThis.fetch;
+
+  beforeEach(() => {
+    globalThis.fetch = vi.fn();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.clearAllMocks();
+  });
+
+  it("hydrates a site project from relative sites/<slug> metadata paths", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              filename: "mofa-site-session.json",
+              path: "sites/physics-learning-studio/mofa-site-session.json",
+              size: 512,
+              modified: "2026-06-07T15:27:03Z",
+              category: "report",
+              group: "sites/physics-learning-studio",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            version: 1,
+            command: "/new site learning",
+            preset_key: "learning",
+            template: "quarto-lesson",
+            site_kind: "docs",
+            site_name: "Physics Learning Studio",
+            description: "",
+            accent: "",
+            reference: "",
+            reference_label: "",
+            site_slug: "physics-learning-studio",
+            preview_base_path: "",
+            preview_url:
+              "/api/preview/tenant-a/site-123/physics-learning-studio/index.html",
+            build_output_dir: "",
+            project_dir: "sites/physics-learning-studio",
+            pages: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const project = await hydrateSiteProjectFromSession("site-123", "tenant-a");
+
+    expect(project).toMatchObject({
+      id: "site-123",
+      title: "Physics Learning Studio",
+      profileId: "tenant-a",
+      template: "quarto-lesson",
+      siteKind: "docs",
+      slug: "physics-learning-studio",
+      scaffolded: true,
+      previewUrl:
+        "/api/preview/tenant-a/site-123/physics-learning-studio/index.html",
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("falls back to an unscoped site file listing when session-scoped files are empty", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify([]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify([
+            {
+              filename: "mofa-site-session.json",
+              path: "sites/physics-learning-studio/mofa-site-session.json",
+              size: 512,
+              modified: "2026-06-07T15:27:03Z",
+              category: "report",
+              group: "sites/physics-learning-studio",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            version: 1,
+            command: "/new site learning",
+            preset_key: "learning",
+            template: "quarto-lesson",
+            site_kind: "docs",
+            site_name: "Physics Learning Studio",
+            description: "",
+            accent: "",
+            reference: "",
+            reference_label: "",
+            site_slug: "physics-learning-studio",
+            preview_base_path: "",
+            preview_url:
+              "/api/preview/tenant-a/site-123/physics-learning-studio/index.html",
+            build_output_dir: "",
+            project_dir: "sites/physics-learning-studio",
+            pages: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const project = await hydrateSiteProjectFromSession("site-123", "tenant-a");
+
+    expect(project?.slug).toBe("physics-learning-studio");
+    const firstUrl = String(
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][0],
+    );
+    const secondUrl = String(
+      (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1][0],
+    );
+    expect(firstUrl).toContain("session_id=site-123");
+    expect(secondUrl).not.toContain("session_id=");
+  });
+
+  it("hydrates a site project when file.path is opaque and file.group carries the workspace directory", async () => {
+    const files = [
+      {
+        filename: "mofa-site-session.json",
+        path: "pf/opaque/mofa-site-session.json",
+        size: 512,
+        modified: "2026-06-07T15:27:03Z",
+        category: "report",
+        group: "sites/physics-learning-studio",
+      },
+    ];
+    (globalThis.fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(files), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            version: 1,
+            command: "/new site learning",
+            preset_key: "learning",
+            template: "quarto-lesson",
+            site_kind: "docs",
+            site_name: "Physics Learning Studio",
+            description: "",
+            accent: "",
+            reference: "",
+            reference_label: "",
+            site_slug: "physics-learning-studio",
+            preview_base_path: "",
+            preview_url:
+              "/api/preview/tenant-a/site-123/physics-learning-studio/index.html",
+            build_output_dir: "",
+            project_dir: "sites/physics-learning-studio",
+            pages: [],
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+    const project = await hydrateSiteProjectFromSession("site-123", "tenant-a");
+
+    expect(project?.slug).toBe("physics-learning-studio");
+    expect(project?.title).toBe("Physics Learning Studio");
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(String((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1][0]))
+      .toContain(encodeURIComponent("pf/opaque/mofa-site-session.json"));
   });
 });
