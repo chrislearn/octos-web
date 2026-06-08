@@ -211,12 +211,18 @@ export async function hydrateSiteProjectFromSession(
   profileIdOverride?: string | null,
 ): Promise<SiteProject | null> {
   const profileId = profileIdOverride || (await ensureSelectedProfileId());
-  const files = await listSiteFiles("sites", {
+  let files = await listSiteFiles("sites", {
     sessionId,
     profileId: profileId || undefined,
   });
 
-  const slug = resolveSiteSlug(files);
+  let slug = resolveSiteSlug(files);
+  if (!slug) {
+    files = await listSiteFiles("sites", {
+      profileId: profileId || undefined,
+    });
+    slug = resolveSiteSlug(files);
+  }
   if (!slug) return null;
 
   const session = await fetchSiteSession(slug, files, {
@@ -291,11 +297,9 @@ export function inferGroupName(
 
 function resolveSiteSessionPath(slug: string, files: SiteFileEntry[]): string | null {
   const normalizedSlug = normalizeDir(slug).split("/").pop() || slug;
-  const marker = `/sites/${normalizedSlug}/`;
   for (const file of files) {
     if (file.filename !== "mofa-site-session.json") continue;
-    const normalizedPath = file.path.replace(/\\/g, "/");
-    if (normalizedPath.includes(marker)) {
+    if (resolveSiteSlugFromEntry(file) === normalizedSlug) {
       return file.path;
     }
   }
@@ -311,12 +315,23 @@ function resolveSiteSlug(files: SiteFileEntry[]): string | null {
       continue;
     }
 
-    const normalizedPath = file.path.replace(/\\/g, "/");
-    const match = normalizedPath.match(/\/sites\/([^/]+)\//);
-    if (match?.[1]) return match[1];
+    const slug = resolveSiteSlugFromEntry(file);
+    if (slug) return slug;
   }
 
   return null;
+}
+
+function resolveSiteSlugFromEntry(
+  file: Pick<SiteFileEntry, "path" | "group">,
+): string | null {
+  return resolveSiteSlugFromPath(file.path) || resolveSiteSlugFromPath(file.group);
+}
+
+function resolveSiteSlugFromPath(path: string): string | null {
+  const normalizedPath = path.replace(/\\/g, "/");
+  const match = normalizedPath.match(/(?:^|\/)sites\/([^/]+)(?:\/|$)/);
+  return match?.[1] || null;
 }
 
 function normalizeDir(dir: string): string {

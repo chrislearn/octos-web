@@ -10,6 +10,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import * as authApi from "@/api/auth";
 import {
   clearToken,
+  extractProfileIdFromPayload,
   getToken,
   setSelectedProfileId,
   setToken,
@@ -71,15 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const resp = await authApi.me();
     setUser(resp.user);
     setPortal(resp.portal);
-    const maybeProfileId =
-      typeof resp.profile === "object" &&
-      resp.profile !== null &&
-      "profile" in resp.profile &&
-      typeof (resp.profile as { profile?: unknown }).profile === "object" &&
-      (resp.profile as { profile?: { id?: unknown } }).profile !== null
-        ? (resp.profile as { profile?: { id?: unknown } }).profile?.id
-        : null;
-    if (typeof maybeProfileId === "string" && maybeProfileId.trim()) {
+    const maybeProfileId = extractProfileIdFromPayload(resp);
+    if (maybeProfileId) {
       setSelectedProfileId(maybeProfileId);
     } else if (typeof window !== "undefined") {
       // Issue #111.3: when `/me` returns no profile, clear any stale

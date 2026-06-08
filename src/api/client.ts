@@ -67,6 +67,35 @@ export function setSelectedProfileId(profileId: string) {
   localStorage.setItem("selected_profile", profileId);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function nonEmptyString(value: unknown): string | null {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+export function extractProfileIdFromPayload(payload: unknown): string | null {
+  const root = asRecord(payload);
+  if (!root) return null;
+
+  const profile = asRecord(root.profile);
+  const profileId = nonEmptyString(profile?.id);
+  if (profileId) return profileId;
+
+  const nestedProfile = asRecord(profile?.profile);
+  const nestedProfileId = nonEmptyString(nestedProfile?.id);
+  if (nestedProfileId) return nestedProfileId;
+
+  const portal = asRecord(root.portal);
+  const homeProfileId = nonEmptyString(portal?.home_profile_id);
+  if (homeProfileId) return homeProfileId;
+
+  return nonEmptyString(root.profile_id);
+}
+
 let selectedProfilePromise: Promise<string | null> | null = null;
 
 export async function ensureSelectedProfileId(): Promise<string | null> {
@@ -83,8 +112,8 @@ export async function ensureSelectedProfileId(): Promise<string | null> {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!resp.ok) return null;
-      const payload = (await resp.json()) as { profile?: { id?: string } };
-      const profileId = payload.profile?.id?.trim();
+      const payload = await resp.json();
+      const profileId = extractProfileIdFromPayload(payload);
       if (profileId) {
         setSelectedProfileId(profileId);
         return profileId;
