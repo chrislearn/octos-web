@@ -288,6 +288,7 @@ export function SitePreview({
     const separator = signed.preview_url.includes("?") ? "&" : "?";
     return `${signed.preview_url}${separator}v=${refreshTick}`;
   }, [signed?.preview_url, refreshTick]);
+  const openPreviewUrl = iframeUrl || previewUrl;
 
   const handleCopyPreviewUrl = useCallback(() => {
     if (!previewUrl) return;
@@ -359,7 +360,7 @@ export function SitePreview({
             <RefreshCw size={16} />
           </button>
           <a
-            href={previewUrl}
+            href={openPreviewUrl}
             target="_blank"
             rel="noreferrer"
             className="rounded-lg p-2 text-muted transition hover:bg-surface-container hover:text-text"
@@ -398,10 +399,11 @@ export function SitePreview({
              *
              * `allow-scripts` + `allow-forms` are required for
              * legitimate framework hydration (Next/Astro/React) and
-             * site forms. `allow-same-origin` is INTENTIONALLY OMITTED
-             * — granting it would defeat the fix because the iframe
-             * IS same-origin with the parent, so it could still reach
-             * `window.parent.localStorage`.
+             * site forms. `allow-same-origin` is also required for
+             * Vite/React module-script previews: without it, the
+             * sandboxed document has an opaque origin and the browser
+             * blocks the generated module bundle as a CORS load from
+             * `Origin: null`, leaving the preview frame blank.
              *
              * This duplicates the attribute from PR #139
              * (`fix/site-preview-iframe-sandbox`). If #139 merges
@@ -413,7 +415,7 @@ export function SitePreview({
               src={iframeUrl}
               title={`${siteName} preview`}
               className="h-full w-full border-0"
-              sandbox="allow-scripts allow-forms"
+              sandbox="allow-scripts allow-forms allow-same-origin"
               onLoad={handleLoad}
             />
           ) : (

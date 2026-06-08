@@ -397,10 +397,13 @@ describe("<SitePreview> signed-URL iframe", () => {
    * test). The preview is same-origin with the SPA; without `sandbox`
    * the LLM-authored HTML in the preview can read
    * `window.parent.localStorage` and exfiltrate auth tokens. The
-   * sandbox attribute must equal `"allow-scripts allow-forms"`
-   * (NOT `allow-same-origin` — that defeats the fix).
+   * Vite/React production previews emit module scripts. Without
+   * `allow-same-origin`, the sandboxed document has an opaque origin
+   * and browsers treat the module script fetch as a CORS request from
+   * `Origin: null`; the preview server does not emit CORS headers, so
+   * the JS bundle is blocked and the iframe stays blank.
    */
-  it("renders iframe with sandbox=\"allow-scripts allow-forms\" (issue #993 / PR #139)", async () => {
+  it("renders iframe sandbox that allows Vite module previews to load", async () => {
     const now = Date.now();
     signPreviewMock.mockResolvedValueOnce({
       token: SIGNED_TOKEN,
@@ -427,15 +430,44 @@ describe("<SitePreview> signed-URL iframe", () => {
     const iframe = harness.container.querySelector("iframe");
     expect(iframe).not.toBeNull();
     const sandboxAttr = iframe?.getAttribute("sandbox") ?? "";
-    expect(sandboxAttr).toBe("allow-scripts allow-forms");
+    expect(sandboxAttr).toBe("allow-scripts allow-forms allow-same-origin");
 
-    // Anti-regression for the headline #993 anti-assertion: granting
-    // `allow-same-origin` here would re-enable
-    // `window.parent.localStorage` reads from inside the iframe.
     const tokens = sandboxAttr.split(/\s+/).filter(Boolean);
     expect(tokens).toContain("allow-scripts");
     expect(tokens).toContain("allow-forms");
-    expect(tokens).not.toContain("allow-same-origin");
+    expect(tokens).toContain("allow-same-origin");
+
+    harness.unmount();
+  });
+
+  it("uses the signed URL for the open-in-new-tab action", async () => {
+    const now = Date.now();
+    signPreviewMock.mockResolvedValueOnce({
+      token: SIGNED_TOKEN,
+      preview_url: SIGNED_URL,
+      expires_at: new Date(now + 600_000).toISOString(),
+    });
+
+    let harness!: MountedHarness;
+    await act(async () => {
+      harness = mount(
+        <SitePreview
+          previewUrl="/api/preview/tenant-a/site-A/test-site/index.html"
+          siteName="Test Site"
+          template="react-vite"
+          sessionId="site-A"
+          profileId="tenant-a"
+          slug="test-site"
+        />,
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const openLink = harness.container.querySelector(
+      "a[title='Open preview in new tab']",
+    );
+    expect(openLink?.getAttribute("href")).toContain(SIGNED_URL);
 
     harness.unmount();
   });
