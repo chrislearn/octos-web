@@ -1,71 +1,78 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Cpu, Save, Loader2, Check, RotateCcw } from "lucide-react";
-import {
-  getProfile,
-  updateProfile,
-  type LlmConfig,
-} from "./settings-api";
+import { updateMyProfile, type Profile } from "./settings-api";
 
 interface LlmTabProps {
-  profileId: string;
+  profile: Profile;
+  onProfileUpdated: (p: Profile) => void;
 }
 
-const DEFAULT_LLM_CONFIG: LlmConfig = {
-  model: "",
-  temperature: 0.7,
-  max_tokens: 4096,
-  system_prompt: "",
-};
+interface LlmFormState {
+  family_id: string;
+  model_id: string;
+  system_prompt: string;
+  max_output_tokens: string; // string for input binding, empty = null
+}
 
-export function LlmTab({ profileId }: LlmTabProps) {
-  const [config, setConfig] = useState<LlmConfig>(DEFAULT_LLM_CONFIG);
-  const [originalConfig, setOriginalConfig] = useState<LlmConfig>(DEFAULT_LLM_CONFIG);
-  const [loading, setLoading] = useState(true);
+function profileToForm(profile: Profile): LlmFormState {
+  return {
+    family_id: profile.config.llm.primary.family_id ?? "",
+    model_id: profile.config.llm.primary.model_id ?? "",
+    system_prompt: profile.config.gateway.system_prompt ?? "",
+    max_output_tokens:
+      profile.config.gateway.max_output_tokens != null
+        ? String(profile.config.gateway.max_output_tokens)
+        : "",
+  };
+}
+
+export function LlmTab({ profile, onProfileUpdated }: LlmTabProps) {
+  const [form, setForm] = useState<LlmFormState>(() => profileToForm(profile));
+  const [original, setOriginal] = useState<LlmFormState>(() => profileToForm(profile));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    getProfile(profileId).then((data) => {
-      if (cancelled) return;
-      const llm = data?.profile?.llm_config ?? DEFAULT_LLM_CONFIG;
-      setConfig({ ...DEFAULT_LLM_CONFIG, ...llm });
-      setOriginalConfig({ ...DEFAULT_LLM_CONFIG, ...llm });
-      setLoading(false);
-      setError(null);
-    });
-    return () => { cancelled = true; };
-  }, [profileId]);
-
-  const isDirty = JSON.stringify(config) !== JSON.stringify(originalConfig);
+  const isDirty = JSON.stringify(form) !== JSON.stringify(original);
 
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    const result = await updateProfile(profileId, { llm_config: config });
+
+    const maxTokens = form.max_output_tokens.trim()
+      ? parseInt(form.max_output_tokens, 10) || null
+      : null;
+
+    const result = await updateMyProfile({
+      config: {
+        llm: {
+          primary: { family_id: form.family_id, model_id: form.model_id },
+          fallbacks: profile.config.llm.fallbacks,
+        },
+        gateway: {
+          ...profile.config.gateway,
+          system_prompt: form.system_prompt.trim() || null,
+          max_output_tokens: maxTokens,
+        },
+      },
+    });
+
     setSaving(false);
     if (result) {
-      const llm = result.profile?.llm_config ?? config;
-      setOriginalConfig({ ...DEFAULT_LLM_CONFIG, ...llm });
+      onProfileUpdated(result);
+      const newForm = profileToForm(result);
+      setForm(newForm);
+      setOriginal(newForm);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } else {
-      setError("Failed to update LLM config. The server may not support this endpoint yet.");
+      setError("Failed to update LLM config.");
     }
   };
 
   const handleReset = () => {
-    setConfig({ ...originalConfig });
+    setForm({ ...original });
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 size={20} className="animate-spin text-muted" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
@@ -81,54 +88,47 @@ export function LlmTab({ profileId }: LlmTabProps) {
         </div>
 
         <div className="space-y-5">
-          {/* Model */}
+          {/* Provider / Family ID */}
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted">
+              Provider (family_id)
+            </label>
+            <input
+              type="text"
+              value={form.family_id}
+              onChange={(e) => setForm((f) => ({ ...f, family_id: e.target.value }))}
+              placeholder="e.g. openai, anthropic, deepseek"
+              className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm text-text placeholder-muted/50 outline-none border border-transparent focus:border-accent/30 transition"
+            />
+          </div>
+
+          {/* Model ID */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted">
               Model
             </label>
             <input
               type="text"
-              value={config.model ?? ""}
-              onChange={(e) => setConfig((c) => ({ ...c, model: e.target.value }))}
-              placeholder="e.g. gpt-4o, claude-sonnet-4-20250514"
+              value={form.model_id}
+              onChange={(e) => setForm((f) => ({ ...f, model_id: e.target.value }))}
+              placeholder="e.g. gpt-5.5, claude-sonnet-4-20250514"
               className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm text-text placeholder-muted/50 outline-none border border-transparent focus:border-accent/30 transition"
             />
           </div>
 
-          {/* Temperature */}
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="text-xs font-medium text-muted">Temperature</label>
-              <span className="text-xs font-mono text-accent">{config.temperature?.toFixed(2) ?? "0.70"}</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.05}
-              value={config.temperature ?? 0.7}
-              onChange={(e) => setConfig((c) => ({ ...c, temperature: parseFloat(e.target.value) }))}
-              className="w-full accent-accent"
-            />
-            <div className="mt-1 flex justify-between text-[10px] text-muted/60">
-              <span>Precise (0)</span>
-              <span>Balanced (1)</span>
-              <span>Creative (2)</span>
-            </div>
-          </div>
-
-          {/* Max tokens */}
+          {/* Max Output Tokens */}
           <div>
             <label className="mb-1.5 block text-xs font-medium text-muted">
-              Max Tokens
+              Max Output Tokens
             </label>
             <input
               type="number"
               min={256}
               max={128000}
               step={256}
-              value={config.max_tokens ?? 4096}
-              onChange={(e) => setConfig((c) => ({ ...c, max_tokens: parseInt(e.target.value) || 4096 }))}
+              value={form.max_output_tokens}
+              onChange={(e) => setForm((f) => ({ ...f, max_output_tokens: e.target.value }))}
+              placeholder="Leave empty for default"
               className="w-full rounded-xl bg-surface-container px-4 py-3 text-sm text-text placeholder-muted/50 outline-none border border-transparent focus:border-accent/30 transition"
             />
           </div>
@@ -139,8 +139,8 @@ export function LlmTab({ profileId }: LlmTabProps) {
               System Prompt
             </label>
             <textarea
-              value={config.system_prompt ?? ""}
-              onChange={(e) => setConfig((c) => ({ ...c, system_prompt: e.target.value }))}
+              value={form.system_prompt}
+              onChange={(e) => setForm((f) => ({ ...f, system_prompt: e.target.value }))}
               placeholder="Optional system prompt override..."
               rows={4}
               className="w-full resize-y rounded-xl bg-surface-container px-4 py-3 text-sm text-text placeholder-muted/50 outline-none border border-transparent focus:border-accent/30 transition"

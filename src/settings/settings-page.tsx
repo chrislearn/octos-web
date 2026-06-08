@@ -12,7 +12,7 @@ import {
   Radio,
   Loader2,
 } from "lucide-react";
-import { listProfiles, type ProfileSummary } from "./settings-api";
+import { getMyProfile, type Profile } from "./settings-api";
 import { ProfileTab } from "./profile-tab";
 import { LlmTab } from "./llm-tab";
 import { SkillsTab } from "./skills-tab";
@@ -32,22 +32,28 @@ export function AdminSettingsPage() {
   const { portal } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
-  const [profiles, setProfiles] = useState<ProfileSummary[]>([]);
-  const [selectedProfileId, setSelectedProfileId] = useState<string>("");
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Derive accessible profiles from portal context (no extra API call needed)
+  const accessibleProfiles = portal?.accessible_profiles ?? [];
+  // Initialize selectedProfileId directly from portal (no effect needed)
+  const [selectedProfileId, setSelectedProfileId] = useState<string>(
+    () => portal?.home_profile_id ?? "",
+  );
+
+  // Fetch the current profile via GET /api/my/profile.
+  // loading starts as true; after the first fetch it resets via the callback.
   useEffect(() => {
-    listProfiles().then((data) => {
-      setProfiles(data);
-      // Pick the home profile from portal context, or fall back to first
-      const homeId = portal?.home_profile_id;
-      const match = data.find((p) => p.id === homeId) ?? data[0];
-      if (match) {
-        setSelectedProfileId(match.id);
+    let cancelled = false;
+    getMyProfile().then((data) => {
+      if (!cancelled) {
+        setProfile(data);
+        setLoading(false);
       }
-      setLoading(false);
     });
-  }, [portal]);
+    return () => { cancelled = true; };
+  }, [selectedProfileId]);
 
   return (
     <div className="flex h-screen flex-col bg-surface-dark">
@@ -73,14 +79,14 @@ export function AdminSettingsPage() {
 
         <div className="flex-1" />
 
-        {/* Profile selector (when multiple profiles) */}
-        {profiles.length > 1 && (
+        {/* Profile selector (when multiple accessible profiles) */}
+        {accessibleProfiles.length > 1 && (
           <select
             value={selectedProfileId}
             onChange={(e) => setSelectedProfileId(e.target.value)}
             className="rounded-xl bg-surface-container px-3 py-2 text-sm text-text outline-none border border-transparent focus:border-accent/30 transition"
           >
-            {profiles.map((p) => (
+            {accessibleProfiles.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name || p.id}
               </option>
@@ -126,12 +132,16 @@ export function AdminSettingsPage() {
           {/* Content area */}
           <main className="flex-1 min-w-0 overflow-y-auto px-8 py-6">
             <div className="mx-auto max-w-2xl">
-              {selectedProfileId ? (
+              {profile ? (
                 <>
-                  {activeTab === "profile" && <ProfileTab profileId={selectedProfileId} />}
-                  {activeTab === "llm" && <LlmTab profileId={selectedProfileId} />}
-                  {activeTab === "skills" && <SkillsTab profileId={selectedProfileId} />}
-                  {activeTab === "channels" && <ChannelsTab profileId={selectedProfileId} />}
+                  {activeTab === "profile" && (
+                    <ProfileTab profile={profile} onProfileUpdated={setProfile} />
+                  )}
+                  {activeTab === "llm" && (
+                    <LlmTab profile={profile} onProfileUpdated={setProfile} />
+                  )}
+                  {activeTab === "skills" && <SkillsTab />}
+                  {activeTab === "channels" && <ChannelsTab profile={profile} />}
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-20">

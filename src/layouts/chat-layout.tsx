@@ -23,7 +23,7 @@ import { useNavigate } from "react-router-dom";
 import { useFileStore } from "@/store/file-store";
 
 export function ChatLayout({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, portal, logout } = useAuth();
   const navigate = useNavigate();
   const { sessions, currentSessionId, currentSessionTitle, historyTopic, renameSession } =
     useSession();
@@ -154,14 +154,16 @@ export function ChatLayout({ children }: { children: ReactNode }) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => navigate("/settings")}
-                    className="glass-icon-button rounded-[10px] p-2"
-                    title="Settings"
-                    aria-label="Settings"
-                  >
-                    <Settings size={14} />
-                  </button>
+                  {portal?.can_access_admin_portal && (
+                    <button
+                      onClick={() => navigate("/settings")}
+                      className="glass-icon-button rounded-[10px] p-2"
+                      title="Settings"
+                      aria-label="Settings"
+                    >
+                      <Settings size={14} />
+                    </button>
+                  )}
                   <button
                     onClick={logout}
                     className="glass-icon-button rounded-[10px] p-2"

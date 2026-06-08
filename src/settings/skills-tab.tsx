@@ -1,29 +1,33 @@
-import { useState, useEffect } from "react";
-import { Puzzle, Loader2, CheckCircle2, XCircle, RefreshCw } from "lucide-react";
-import { getProfileSkills, type SkillInfo } from "./settings-api";
+import { useState, useEffect, useRef } from "react";
+import { Puzzle, Loader2, Wrench, RefreshCw } from "lucide-react";
+import { getMyProfileSkills, type SkillInfo } from "./settings-api";
 
-interface SkillsTabProps {
-  profileId: string;
-}
-
-export function SkillsTab({ profileId }: SkillsTabProps) {
+export function SkillsTab() {
   const [skills, setSkills] = useState<SkillInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const loadSkills = (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setError(null);
-    getProfileSkills(profileId).then((data) => {
-      setSkills(data);
-      setLoading(false);
-    });
-  };
+  const mountedRef = useRef(true);
 
   useEffect(() => {
-    loadSkills();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId]);
+    mountedRef.current = true;
+    let cancelled = false;
+    getMyProfileSkills().then((data) => {
+      if (!cancelled) {
+        setSkills(data);
+        setLoading(false);
+      }
+    });
+    return () => { cancelled = true; mountedRef.current = false; };
+  }, []);
+
+  const handleRefresh = () => {
+    setError(null);
+    getMyProfileSkills().then((data) => {
+      if (mountedRef.current) {
+        setSkills(data);
+      }
+    });
+  };
 
   if (loading) {
     return (
@@ -51,7 +55,7 @@ export function SkillsTab({ profileId }: SkillsTabProps) {
             </div>
           </div>
           <button
-            onClick={() => loadSkills(false)}
+            onClick={handleRefresh}
             className="glass-icon-button rounded-xl p-2.5"
             title="Refresh"
           >
@@ -91,24 +95,15 @@ export function SkillsTab({ profileId }: SkillsTabProps) {
                       </span>
                     )}
                   </div>
-                  {skill.description && (
+                  {skill.source_repo && (
                     <p className="mt-0.5 text-xs text-muted truncate">
-                      {skill.description}
+                      {skill.source_repo}
                     </p>
                   )}
                 </div>
-                <div className="shrink-0">
-                  {skill.enabled ? (
-                    <span className="flex items-center gap-1.5 text-xs font-medium text-green-400">
-                      <CheckCircle2 size={14} />
-                      Active
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-xs font-medium text-muted/60">
-                      <XCircle size={14} />
-                      Inactive
-                    </span>
-                  )}
+                <div className="shrink-0 flex items-center gap-1.5 text-xs font-medium text-muted">
+                  <Wrench size={12} />
+                  <span>{skill.tool_count} tool{skill.tool_count === 1 ? "" : "s"}</span>
                 </div>
               </div>
             ))}
