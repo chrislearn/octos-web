@@ -924,6 +924,104 @@ button, a, input, textarea {
   transform: scale(0.95);
 }
 
+/* ── Home bubble markdown (AI responses) ─────────── */
+/* Inherits .home-bubble-text sizing (1.25rem) and applies prose-like
+   styling for readable markdown on the deep-dark home background. */
+.home-bubble-markdown {
+  line-height: 1.65;
+}
+.home-bubble-markdown p {
+  margin: 0 0 0.6em;
+}
+.home-bubble-markdown p:last-child {
+  margin-bottom: 0;
+}
+.home-bubble-markdown a {
+  color: #7fc4ff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(127, 196, 255, 0.35);
+}
+.home-bubble-markdown a:hover {
+  text-decoration-color: #7fc4ff;
+}
+.home-bubble-markdown strong {
+  color: #f0f4f8;
+  font-weight: 600;
+}
+.home-bubble-markdown code:not(pre code) {
+  background: rgba(255, 140, 86, 0.14);
+  color: #ffb38c;
+  padding: 0.12em 0.35em;
+  border-radius: 5px;
+  font-size: 0.88em;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+.home-bubble-markdown pre {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  padding: 0.75em 1em;
+  margin: 0.6em 0;
+  overflow-x: auto;
+  font-size: 0.85em;
+  line-height: 1.5;
+  color: #d0ddef;
+}
+.home-bubble-markdown ul,
+.home-bubble-markdown ol {
+  margin: 0.4em 0;
+  padding-left: 1.4em;
+}
+.home-bubble-markdown li {
+  margin: 0.25em 0;
+}
+.home-bubble-markdown li::marker {
+  color: rgba(255, 255, 255, 0.4);
+}
+.home-bubble-markdown blockquote {
+  border-left: 3px solid rgba(255, 255, 255, 0.2);
+  padding: 0.4em 0.8em;
+  margin: 0.5em 0;
+  color: rgba(255, 255, 255, 0.65);
+  font-style: italic;
+}
+.home-bubble-markdown h1,
+.home-bubble-markdown h2,
+.home-bubble-markdown h3,
+.home-bubble-markdown h4 {
+  color: #f0f4f8;
+  margin: 0.8em 0 0.3em;
+  font-weight: 600;
+}
+.home-bubble-markdown h1 { font-size: 1.3em; }
+.home-bubble-markdown h2 { font-size: 1.15em; }
+.home-bubble-markdown h3 { font-size: 1.05em; }
+.home-bubble-markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+}
+.home-bubble-markdown th,
+.home-bubble-markdown td {
+  padding: 0.4em 0.6em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: left;
+}
+.home-bubble-markdown th {
+  color: #f0f4f8;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+}
+.home-bubble-markdown hr {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  margin: 1em 0;
+}
+
 /* ── Responsive adjustments for small screens ────── */
 @media (max-width: 480px) {
   .home-clock {

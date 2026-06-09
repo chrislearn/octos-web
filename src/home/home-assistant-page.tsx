@@ -39,6 +39,7 @@ const HOME_SESSION_TITLE = "Home Assistant";
 function HomeAssistantShell() {
   const { currentSessionId, createSession, switchSession } = useSession();
   const [mode, setMode] = useState<Mode>("standby");
+  const [prefill, setPrefill] = useState<string | undefined>(undefined);
   const initRef = useRef(false);
 
   // Resolve the target home session id synchronously during render
@@ -64,8 +65,15 @@ function HomeAssistantShell() {
     }
   }, [homeSessionId, currentSessionId, switchSession]);
 
-  const activate = useCallback(() => setMode("conversation"), []);
-  const deactivate = useCallback(() => setMode("standby"), []);
+  const activate = useCallback((cardPrefill?: string) => {
+    setPrefill(cardPrefill);
+    setMode("conversation");
+  }, []);
+
+  const deactivate = useCallback(() => {
+    setPrefill(undefined);
+    setMode("standby");
+  }, []);
 
   return (
     <>
@@ -88,7 +96,7 @@ function HomeAssistantShell() {
             : "opacity-0 pointer-events-none z-0"
         }`}
       >
-        <ConversationView onBack={deactivate} />
+        <ConversationView onBack={deactivate} prefill={prefill} />
       </div>
     </>
   );
