@@ -80,10 +80,12 @@ test.describe("Settings page — tab smoke tests", () => {
     await goToSettings(page);
     await clickTab(page, "LLM");
 
+    // Wait for the LLM tab content to fully render (profile-dependent)
+    const llmHeading = page.getByRole("heading", { name: "LLM Configuration" });
+    await llmHeading.waitFor({ state: "visible", timeout: TIMEOUT });
+
     // "LLM Configuration" heading
-    await expect(
-      page.locator("h3", { hasText: "LLM Configuration" }),
-    ).toBeVisible({ timeout: TIMEOUT });
+    await expect(llmHeading).toBeVisible();
 
     // Provider dropdown (select element with "Select a provider..." option)
     await expect(
@@ -92,7 +94,7 @@ test.describe("Settings page — tab smoke tests", () => {
 
     // "Fallback Models" heading
     await expect(
-      page.locator("h3", { hasText: "Fallback Models" }),
+      page.getByRole("heading", { name: "Fallback Models" }),
     ).toBeVisible({ timeout: TIMEOUT });
   });
 
@@ -182,14 +184,14 @@ test.describe("Settings page — tab smoke tests", () => {
     await expect(
       page.locator("h3", { hasText: "Profile Information" }),
     ).toBeHidden({ timeout: TIMEOUT });
-    await expect(
-      page.locator("h3", { hasText: "LLM Configuration" }),
-    ).toBeVisible({ timeout: TIMEOUT });
+    const llmHeading = page.getByRole("heading", { name: "LLM Configuration" });
+    await llmHeading.waitFor({ state: "visible", timeout: TIMEOUT });
+    await expect(llmHeading).toBeVisible();
 
     // Switch to Skills — LLM heading should disappear, Skills heading should appear
     await clickTab(page, "Skills");
     await expect(
-      page.locator("h3", { hasText: "LLM Configuration" }),
+      page.getByRole("heading", { name: "LLM Configuration" }),
     ).toBeHidden({ timeout: TIMEOUT });
     await expect(
       page.locator("h3", { hasText: "Installed Skills" }),
