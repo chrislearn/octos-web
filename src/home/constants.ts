@@ -36,6 +36,12 @@ export const HOME_STRINGS = {
   cardMusic: "Music",
   cardHome: "Home",
 
+  // Quick-action card prefills (empty string = no prefill)
+  cardChatPrefill: "",
+  cardNewsPrefill: "What's the latest news today?",
+  cardMusicPrefill: "Play some music for me",
+  cardHomePrefill: "What's the status of my home devices?",
+
   // Misc
   backToStandby: "Back",
   send: "Send",
@@ -45,6 +51,13 @@ export const HOME_STRINGS = {
 
   // Idle return
   idleReturnSeconds: 30,
+} as const;
+
+/** Fallback location used when both geolocation and IP-based lookup fail. */
+export const DEFAULT_LOCATION = {
+  lat: 37.7749,
+  lon: -122.4194,
+  city: "San Francisco",
 } as const;
 
 // Open-Meteo WMO weather code → emoji + label

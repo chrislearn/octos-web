@@ -12,14 +12,14 @@ import { useWeather } from "./use-weather";
 import { HOME_STRINGS } from "./constants";
 
 interface StandbyViewProps {
-  onActivate: () => void;
+  onActivate: (prefill?: string) => void;
 }
 
 const QUICK_ACTIONS = [
-  { id: "chat", icon: MessageSquare, label: HOME_STRINGS.cardChat, color: "text-blue-400" },
-  { id: "news", icon: Newspaper, label: HOME_STRINGS.cardNews, color: "text-amber-400" },
-  { id: "music", icon: Music, label: HOME_STRINGS.cardMusic, color: "text-emerald-400" },
-  { id: "home", icon: Home, label: HOME_STRINGS.cardHome, color: "text-purple-400" },
+  { id: "chat", icon: MessageSquare, label: HOME_STRINGS.cardChat, color: "text-blue-400", prefill: HOME_STRINGS.cardChatPrefill },
+  { id: "news", icon: Newspaper, label: HOME_STRINGS.cardNews, color: "text-amber-400", prefill: HOME_STRINGS.cardNewsPrefill },
+  { id: "music", icon: Music, label: HOME_STRINGS.cardMusic, color: "text-emerald-400", prefill: HOME_STRINGS.cardMusicPrefill },
+  { id: "home", icon: Home, label: HOME_STRINGS.cardHome, color: "text-purple-400", prefill: HOME_STRINGS.cardHomePrefill },
 ] as const;
 
 export function StandbyView({ onActivate }: StandbyViewProps) {
@@ -57,6 +57,9 @@ export function StandbyView({ onActivate }: StandbyViewProps) {
               {weather.temperature}&deg;C
             </span>
             <span className="text-lg text-white/50">{weather.label}</span>
+            {weather.city && (
+              <span className="text-lg text-white/40">&middot; {weather.city}</span>
+            )}
           </>
         )}
       </div>
@@ -73,12 +76,12 @@ export function StandbyView({ onActivate }: StandbyViewProps) {
 
       {/* Quick actions */}
       <div className="home-quick-actions mt-10 flex gap-4">
-        {QUICK_ACTIONS.map(({ id, icon: Icon, label, color }) => (
+        {QUICK_ACTIONS.map(({ id, icon: Icon, label, color, prefill }) => (
           <button
             key={id}
             onClick={(e) => {
               e.stopPropagation();
-              onActivate();
+              onActivate(prefill || undefined);
             }}
             className="home-quick-card group flex flex-col items-center justify-center gap-2"
             aria-label={label}

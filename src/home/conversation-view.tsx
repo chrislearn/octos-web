@@ -15,6 +15,8 @@ import {
   useRef,
   useState,
 } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { ArrowLeft, SendHorizontal } from "lucide-react";
 import { useSession } from "@/runtime/session-context";
 import { useThreads, type Thread, type ThreadMessage } from "@/store/thread-store";
@@ -23,6 +25,7 @@ import { HOME_STRINGS } from "./constants";
 
 interface ConversationViewProps {
   onBack: () => void;
+  prefill?: string;
 }
 
 /** Idle-return timer duration in ms. */
@@ -34,7 +37,7 @@ function formatBubbleTime(ts: number): string {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export function ConversationView({ onBack }: ConversationViewProps) {
+export function ConversationView({ onBack, prefill }: ConversationViewProps) {
   const { currentSessionId, historyTopic, refreshSessions, markSessionActive } = useSession();
   const threads = useThreads(currentSessionId, historyTopic);
   const [text, setText] = useState("");
@@ -43,6 +46,19 @@ export function ConversationView({ onBack }: ConversationViewProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const composingRef = useRef(false);
+  const prefillAppliedRef = useRef<string | undefined>(undefined);
+
+  // ── Prefill from card action ────────────────────────────────────
+  useEffect(() => {
+    if (prefill && prefill !== prefillAppliedRef.current) {
+      prefillAppliedRef.current = prefill;
+      setText(prefill);
+      // Focus the textarea after prefill so the user can confirm/edit
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
+    }
+  }, [prefill]);
 
   // ── Idle return ─────────────────────────────────────────────────
   const resetIdle = useCallback(() => {
@@ -60,6 +76,36 @@ export function ConversationView({ onBack }: ConversationViewProps) {
     resetIdle();
   }, [threads, resetIdle]);
 
+  // ── Fix #4: setSending(false) when thread state changes ─────────
+  // Instead of clearing `sending` immediately after fire-and-forget
+  // `bridgeSend`, we watch for the thread store to reflect the new
+  // assistant activity (pendingAssistant appearing or responses growing).
+  const prevThreadSnapshotRef = useRef<{
+    pendingCount: number;
+    responseCount: number;
+  }>({ pendingCount: 0, responseCount: 0 });
+
+  useEffect(() => {
+    if (!sending) return;
+
+    const pendingCount = threads.filter(
+      (t: Thread) => t.pendingAssistant !== null,
+    ).length;
+    const responseCount = threads.reduce(
+      (sum: number, t: Thread) => sum + t.responses.length,
+      0,
+    );
+
+    const prev = prevThreadSnapshotRef.current;
+    if (
+      pendingCount > prev.pendingCount ||
+      responseCount > prev.responseCount
+    ) {
+      setSending(false);
+    }
+    prevThreadSnapshotRef.current = { pendingCount, responseCount };
+  }, [threads, sending]);
+
   // ── Auto-scroll ─────────────────────────────────────────────────
   useEffect(() => {
     const el = scrollRef.current;
@@ -72,6 +118,18 @@ export function ConversationView({ onBack }: ConversationViewProps) {
     if (!trimmed || sending) return;
     setSending(true);
     resetIdle();
+
+    // Snapshot current thread state BEFORE sending so the effect can
+    // detect when the store changes in response.
+    prevThreadSnapshotRef.current = {
+      pendingCount: threads.filter(
+        (t: Thread) => t.pendingAssistant !== null,
+      ).length,
+      responseCount: threads.reduce(
+        (sum: number, t: Thread) => sum + t.responses.length,
+        0,
+      ),
+    };
 
     bridgeSend({
       sessionId: currentSessionId,
@@ -86,8 +144,9 @@ export function ConversationView({ onBack }: ConversationViewProps) {
     });
 
     setText("");
-    setSending(false);
-  }, [text, sending, currentSessionId, historyTopic, refreshSessions, markSessionActive, resetIdle]);
+    // NOTE: setSending(false) is NOT called here — the useEffect above
+    // clears it when the thread store reflects the new activity.
+  }, [text, sending, threads, currentSessionId, historyTopic, refreshSessions, markSessionActive, resetIdle]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -153,7 +212,7 @@ export function ConversationView({ onBack }: ConversationViewProps) {
         )}
         {threads.map((thread: Thread) => (
           <div key={thread.id} className="mb-4">
-            {/* User bubble */}
+            {/* User bubble — plain text */}
             {thread.userMsg && (
               <div className="flex justify-end mb-2">
                 <div className="home-bubble home-bubble-user max-w-[80%] rounded-2xl px-5 py-3">
@@ -167,14 +226,16 @@ export function ConversationView({ onBack }: ConversationViewProps) {
               </div>
             )}
 
-            {/* Assistant bubbles (completed responses) */}
+            {/* Assistant bubbles — markdown rendered */}
             {thread.responses
               .filter((msg: ThreadMessage) => msg.role === "assistant")
               .map((msg: ThreadMessage) => (
               <div key={msg.id} className="flex justify-start mb-2">
                 <div className="home-bubble home-bubble-assistant max-w-[80%] rounded-2xl px-5 py-3">
-                  <div className="home-bubble-text text-white/90">
-                    {msg.text}
+                  <div className="home-bubble-text home-bubble-markdown text-white/90">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {msg.text}
+                    </ReactMarkdown>
                   </div>
                   <div className="mt-1 text-xs text-white/30 tabular-nums">
                     {formatBubbleTime(msg.timestamp)}
@@ -183,13 +244,15 @@ export function ConversationView({ onBack }: ConversationViewProps) {
               </div>
             ))}
 
-            {/* Pending streaming */}
+            {/* Pending streaming — also markdown */}
             {thread.pendingAssistant &&
               thread.pendingAssistant.text && (
                 <div className="flex justify-start mb-2">
                   <div className="home-bubble home-bubble-assistant max-w-[80%] rounded-2xl px-5 py-3">
-                    <div className="home-bubble-text text-white/90">
-                      {thread.pendingAssistant.text}
+                    <div className="home-bubble-text home-bubble-markdown text-white/90">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {thread.pendingAssistant.text}
+                      </ReactMarkdown>
                     </div>
                   </div>
                 </div>
