@@ -773,6 +773,12 @@ button, a, input, textarea {
     #06080f;
   background-size: 100% 200%;
   animation: gradientShift 20s ease-in-out infinite;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.home-standby::-webkit-scrollbar {
+  display: none;
 }
 
 @keyframes gradientShift {

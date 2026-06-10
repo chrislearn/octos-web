@@ -114,7 +114,7 @@ export function StandbyView({ onActivate, nightActive }: StandbyViewProps) {
 
   return (
     <div
-      className={`home-standby flex h-full w-full flex-col items-center justify-center select-none cursor-pointer ${
+      className={`home-standby flex h-full w-full flex-col items-center select-none cursor-pointer overflow-y-auto py-8 ${
         burnIn.dimmed ? "home-dimmed" : ""
       }`}
       onClick={handleClick}
