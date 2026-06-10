@@ -193,14 +193,31 @@ export function ConversationView({ onBack, prefill }: ConversationViewProps) {
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   // ── Prefill from card action ────────────────────────────────────
+  // Non-empty prefill auto-sends (quick actions should fire immediately).
+  // Empty prefill just focuses the input.
   useEffect(() => {
-    if (prefill && prefill !== prefillAppliedRef.current) {
-      prefillAppliedRef.current = prefill;
-      setText(prefill);
-      requestAnimationFrame(() => {
-        textareaRef.current?.focus();
+    if (prefill === undefined || prefill === prefillAppliedRef.current) return;
+    prefillAppliedRef.current = prefill;
+
+    if (prefill) {
+      setSending(true);
+      prevThreadSnapshotRef.current = {
+        pendingCount: threads.filter((t: Thread) => t.pendingAssistant !== null).length,
+        responseCount: threads.reduce((sum: number, t: Thread) => sum + t.responses.length, 0),
+      };
+      bridgeSend({
+        sessionId: currentSessionId,
+        historyTopic,
+        text: prefill,
+        requestText: prefill,
+        media: [],
+        onSessionActive: (firstMsg) => markSessionActive(firstMsg),
+        onComplete: () => void refreshSessions(),
       });
+    } else {
+      requestAnimationFrame(() => textareaRef.current?.focus());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-shot per prefill value
   }, [prefill]);
 
   const { strings, idleSeconds } = useHomeSettings();
