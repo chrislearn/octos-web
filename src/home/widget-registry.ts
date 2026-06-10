@@ -13,7 +13,8 @@ export type WidgetType =
   | "greeting"
   | "news"
   | "calendar"
-  | "timer";
+  | "timer"
+  | "photo-frame";
 
 export interface WidgetConfig {
   type: WidgetType;
@@ -30,6 +31,7 @@ export const DEFAULT_WIDGETS: WidgetConfig[] = [
   { type: "news", enabled: true, order: 5 },
   { type: "calendar", enabled: true, order: 6 },
   { type: "timer", enabled: true, order: 7 },
+  { type: "photo-frame", enabled: false, order: 8 },
 ];
 
 const LS_KEY = "octos_home_widgets";

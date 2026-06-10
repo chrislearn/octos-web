@@ -26,6 +26,7 @@ import { useVoiceInput } from "./use-voice-input";
 import { useNews, timeAgo } from "./use-news";
 import { useEvents } from "./use-events";
 import { TimerWidget } from "./timer-widget";
+import { PhotoFrame } from "./photo-frame";
 
 interface StandbyViewProps {
   onActivate: (prefill?: string) => void;
@@ -362,6 +363,11 @@ export function StandbyView({ onActivate, nightActive }: StandbyViewProps) {
       {/* Timer widget — hidden in night mode or when disabled */}
       {!nightActive && isWidgetOn(widgets, "timer") && (
         <TimerWidget />
+      )}
+
+      {/* Photo frame — hidden in night mode or when disabled */}
+      {!nightActive && isWidgetOn(widgets, "photo-frame") && (
+        <PhotoFrame />
       )}
 
       {/* Settings panel */}

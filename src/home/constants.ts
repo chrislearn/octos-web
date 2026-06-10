@@ -68,7 +68,13 @@ export interface HomeStrings {
   widgetNews: string;
   widgetCalendar: string;
   widgetTimer: string;
+  widgetPhotoFrame: string;
   settingsWidgets: string;
+
+  // Photo frame
+  settingsPhotos: string;
+  settingsAddPhoto: string;
+  settingsPhotoPlaceholder: string;
 
   // News widget
   newsHeadlines: string;
@@ -160,7 +166,12 @@ export const HOME_I18N: Record<string, HomeStrings> = {
     widgetNews: "News",
     widgetCalendar: "Calendar",
     widgetTimer: "Timer",
+    widgetPhotoFrame: "Photos",
     settingsWidgets: "Widgets",
+
+    settingsPhotos: "Photo Frame",
+    settingsAddPhoto: "Add Photo URL",
+    settingsPhotoPlaceholder: "https://example.com/photo.jpg",
 
     newsHeadlines: "Headlines",
 
@@ -252,7 +263,12 @@ export const HOME_I18N: Record<string, HomeStrings> = {
     widgetNews: "\u65B0\u95FB",
     widgetCalendar: "\u65E5\u5386",
     widgetTimer: "\u8BA1\u65F6\u5668",
+    widgetPhotoFrame: "\u76F8\u518C",
     settingsWidgets: "\u7EC4\u4EF6",
+
+    settingsPhotos: "\u7167\u7247\u76F8\u6846",
+    settingsAddPhoto: "\u6DFB\u52A0\u7167\u7247\u94FE\u63A5",
+    settingsPhotoPlaceholder: "https://example.com/photo.jpg",
 
     newsHeadlines: "\u5934\u6761",
 
