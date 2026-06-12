@@ -32,7 +32,7 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
     // Backup audio unlock: if the entry gesture didn't stick, tapping the orb
     // is another gesture that unlocks playback for subsequent replies.
     unlockAudio();
-    if (conv.state === "speaking") conv.interrupt();
+    if (conv.state === "speaking" || conv.state === "thinking") conv.interrupt();
     else if (conv.state === "error") void conv.start();
   };
 

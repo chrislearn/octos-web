@@ -52,9 +52,11 @@ export function pickFreshAudio(
 export function collectFreshAudio(
   threads: Thread[],
   played: Set<string>,
+  ignoredThreadIds: Set<string> = new Set(),
 ): { path: string; text: string }[] {
   const out: { path: string; text: string }[] = [];
   for (let i = 0; i < threads.length; i++) {
+    if (ignoredThreadIds.has(threads[i].id)) continue;
     const asst = threads[i].responses.filter(
       (m: ThreadMessage) => m.role === "assistant",
     );
@@ -86,6 +88,9 @@ export function useVoiceConversation(
   const [lastAssistantText, setLastAssistantText] = useState("");
 
   const playedPathsRef = useRef<Set<string>>(new Set());
+  const ignoredTurnIdsRef = useRef<Set<string>>(new Set());
+  const activeTurnIdRef = useRef<string | null>(null);
+  const speechInterruptArmedRef = useRef(false);
   const replyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const stateRef = useRef<VoiceState>("idle");
   stateRef.current = state;
@@ -106,44 +111,121 @@ export function useVoiceConversation(
   // Stable refs that break the circular dependency between beginListening ↔
   // drainQueue. Each stores itself into its own ref every render.
   const beginListeningRef = useRef<() => Promise<void>>(async () => {});
+  const beginThinkingInterruptRef = useRef<() => Promise<void>>(async () => {});
+  const sendUtteranceRef = useRef<(wav: Blob) => Promise<void>>(async () => {});
   const drainQueueRef = useRef<() => Promise<void>>(async () => {});
 
   const releaseAudio = useCallback(() => {
     stopAudio();
   }, []);
 
+  const requestTurnInterrupt = useCallback(
+    (reason: string): boolean => {
+      const turnId =
+        activeTurnIdRef.current ??
+        threadsRef.current.find(
+          (t) =>
+            t.pendingAssistant !== null &&
+            t.pendingAssistant.status === "streaming",
+        )?.id ??
+        null;
+      if (!turnId) return false;
+      ignoredTurnIdsRef.current.add(turnId);
+      if (activeTurnIdRef.current === turnId) {
+        activeTurnIdRef.current = null;
+      }
+      const bridge = getActiveBridge(sessionId, historyTopic);
+      void bridge?.interruptTurn(turnId, reason).catch(() => {
+        // Best-effort: local state has already moved on.
+      });
+      return true;
+    },
+    [historyTopic, sessionId],
+  );
+
+  const sendCapturedUtterance = useCallback(
+    async (wav: Blob) => {
+      try {
+        const turnId = crypto.randomUUID();
+        activeTurnIdRef.current = turnId;
+        stateRef.current = "thinking";
+        setState("thinking");
+        const file = new File([wav], "utterance.wav", { type: "audio/wav" });
+        const paths = await uploadFiles([file], "recording");
+        // Audio-only turn: the server-side STT transcribes `media` into the
+        // prompt. The reply's TTS audio arrives asynchronously and is played
+        // by the threads watcher below (not here in onComplete).
+        sendMessage({
+          sessionId,
+          historyTopic,
+          text: "",
+          media: paths,
+          clientMessageId: turnId,
+          onComplete: () => {
+            if (activeTurnIdRef.current === turnId) {
+              activeTurnIdRef.current = null;
+            }
+          },
+        });
+        void beginThinkingInterruptRef.current();
+        // Safety net: if no reply audio shows up in time, return to listening.
+        clearTimeout(replyTimerRef.current);
+        replyTimerRef.current = setTimeout(() => {
+          if (stateRef.current === "thinking") {
+            void beginListeningRef.current();
+          }
+        }, REPLY_TIMEOUT_MS);
+      } catch (e) {
+        console.error("[voice] upload/send failed", e);
+        setState("error");
+      }
+    },
+    [historyTopic, sessionId],
+  );
+
+  const beginThinkingInterrupt = useCallback(async () => {
+    if (stateRef.current !== "thinking") return;
+    speechInterruptArmedRef.current = false;
+    await captureStart(
+      (wav: Blob) => {
+        if (!speechInterruptArmedRef.current) return;
+        captureStop();
+        void sendUtteranceRef.current(wav);
+      },
+      {
+        positiveSpeechThreshold: 0.75,
+        negativeSpeechThreshold: 0.55,
+        minSpeechMs: 700,
+        redemptionMs: 650,
+        onSpeechRealStart: () => {
+          if (
+            speechInterruptArmedRef.current ||
+            stateRef.current !== "thinking"
+          ) {
+            return;
+          }
+          speechInterruptArmedRef.current = true;
+          clearTimeout(replyTimerRef.current);
+          clearTimeout(graceTimerRef.current);
+          audioQueueRef.current = [];
+          requestTurnInterrupt("user started speaking while thinking");
+        },
+      },
+    );
+  }, [captureStart, captureStop, requestTurnInterrupt]);
+
   // Define beginListening and playReply with useCallback; each calls the other via its ref.
 
   const beginListening = useCallback(async () => {
+    stateRef.current = "listening";
     setState("listening");
     await captureStart((wav: Blob) => {
       // Ignore late utterances that land after we've left listening.
       if (stateRef.current !== "listening") return;
       captureStop();
-      setState("thinking");
-      void (async () => {
-        try {
-          const file = new File([wav], "utterance.wav", { type: "audio/wav" });
-          const paths = await uploadFiles([file], "recording");
-          // Audio-only turn: the server-side STT transcribes `media` into the
-          // prompt. The reply's TTS audio arrives asynchronously and is played
-          // by the threads watcher below (not here in onComplete).
-          sendMessage({ sessionId, historyTopic, text: "", media: paths });
-          // Safety net: if no reply audio shows up in time, return to listening.
-          clearTimeout(replyTimerRef.current);
-          replyTimerRef.current = setTimeout(() => {
-            if (stateRef.current === "thinking") {
-              void beginListeningRef.current();
-            }
-          }, REPLY_TIMEOUT_MS);
-        } catch (e) {
-          console.error("[voice] upload/send failed", e);
-          setState("error");
-        }
-      })();
+      void sendUtteranceRef.current(wav);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [captureStart, captureStop, sessionId, historyTopic]);
+  }, [captureStart, captureStop]);
 
   // Fetch + play ONE reply-audio file, resolving when playback ends. Does NOT
   // return to listening — `drainQueue` orchestrates ordering across sentences.
@@ -159,6 +241,7 @@ export function useVoiceConversation(
           return;
         }
         const blob = await resp.blob();
+        stateRef.current = "speaking";
         setState("speaking");
         // Play through the autoplay-unlocked AudioContext (see audio-playback.ts);
         // resolve when playback ends, fails to start, OR decode/start throws —
@@ -208,6 +291,8 @@ export function useVoiceConversation(
 
   // Keep refs up to date after every render so closures always call the latest version.
   beginListeningRef.current = beginListening;
+  beginThinkingInterruptRef.current = beginThinkingInterrupt;
+  sendUtteranceRef.current = sendCapturedUtterance;
   drainQueueRef.current = drainQueue;
 
   const start = useCallback(async () => {
@@ -219,8 +304,14 @@ export function useVoiceConversation(
     // chat doesn't replay the previous turn's reply — only audio produced after
     // this point is picked up. (Previously only a browser refresh cleared it.)
     playedPathsRef.current = new Set(
-      collectFreshAudio(threadsRef.current, new Set()).map((a) => a.path),
+      collectFreshAudio(
+        threadsRef.current,
+        new Set(),
+        ignoredTurnIdsRef.current,
+      ).map((a) => a.path),
     );
+    ignoredTurnIdsRef.current = new Set();
+    activeTurnIdRef.current = null;
     turnBaselineRef.current = threadsRef.current.length;
     setLastAssistantText("");
     audioQueueRef.current = [];
@@ -243,10 +334,13 @@ export function useVoiceConversation(
   const stop = useCallback(() => {
     clearTimeout(replyTimerRef.current);
     clearTimeout(graceTimerRef.current);
+    activeTurnIdRef.current = null;
+    speechInterruptArmedRef.current = false;
     audioQueueRef.current = [];
     playingRef.current = false;
     captureStop();
     releaseAudio();
+    stateRef.current = "idle";
     setState("idle");
   }, [captureStop, releaseAudio]);
 
@@ -256,8 +350,16 @@ export function useVoiceConversation(
       clearTimeout(graceTimerRef.current);
       releaseAudio();
       void beginListeningRef.current();
+    } else if (stateRef.current === "thinking") {
+      clearTimeout(replyTimerRef.current);
+      clearTimeout(graceTimerRef.current);
+      audioQueueRef.current = [];
+      speechInterruptArmedRef.current = false;
+      requestTurnInterrupt("user tapped orb while thinking");
+      captureStop();
+      void beginListeningRef.current();
     }
-  }, [releaseAudio]);
+  }, [captureStop, releaseAudio, requestTurnInterrupt]);
 
   useEffect(() => {
     if (captureError) setState("error");
@@ -268,8 +370,15 @@ export function useVoiceConversation(
   // seconds after the turn completes). Only acts while "thinking".
   useEffect(() => {
     if (state !== "thinking" && state !== "speaking") return;
-    const fresh = collectFreshAudio(threads, playedPathsRef.current);
+    const fresh = collectFreshAudio(
+      threads,
+      playedPathsRef.current,
+      ignoredTurnIdsRef.current,
+    );
     if (fresh.length === 0) return;
+    captureStop();
+    speechInterruptArmedRef.current = false;
+    activeTurnIdRef.current = null;
     clearTimeout(replyTimerRef.current);
     clearTimeout(graceTimerRef.current);
     for (const f of fresh) {
@@ -278,7 +387,7 @@ export function useVoiceConversation(
       setLastAssistantText(f.text);
     }
     void drainQueueRef.current();
-  }, [threads, state]);
+  }, [captureStop, threads, state]);
 
   // Stop ONLY on real unmount. Use a ref so identity churn of `stop` across
   // re-renders never re-fires this cleanup (that was tearing the VAD down on

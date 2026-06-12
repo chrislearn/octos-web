@@ -4,9 +4,20 @@ import { encodeWav } from "./wav-encode";
 
 export interface VoiceCapture {
   capturing: boolean;
-  start: (onUtterance: (wav: Blob) => void) => Promise<void>;
+  start: (
+    onUtterance: (wav: Blob) => void,
+    options?: VoiceCaptureStartOptions,
+  ) => Promise<void>;
   stop: () => void;
   error: string | null;
+}
+
+export interface VoiceCaptureStartOptions {
+  positiveSpeechThreshold?: number;
+  negativeSpeechThreshold?: number;
+  minSpeechMs?: number;
+  redemptionMs?: number;
+  onSpeechRealStart?: () => void;
 }
 
 const VAD_SAMPLE_RATE = 16000;
@@ -52,9 +63,18 @@ export function useVoiceCapture(): VoiceCapture {
     setCapturing(false);
   }, []);
 
-  const start = useCallback(async (onUtterance: (wav: Blob) => void) => {
+  const start = useCallback(async (
+    onUtterance: (wav: Blob) => void,
+    options: VoiceCaptureStartOptions = {},
+  ) => {
     setError(null);
     const gen = ++startGenRef.current;
+    const previous = vadRef.current;
+    vadRef.current = null;
+    if (previous) {
+      void previous.pause();
+      void previous.destroy();
+    }
     try {
       const vad = await MicVAD.new({
         baseAssetPath: VAD_BASE_ASSET_PATH,
@@ -65,10 +85,11 @@ export function useVoiceCapture(): VoiceCapture {
         //  - require ≥300ms of real speech before it counts as an utterance
         //    (short clicks fall under this and fire onVADMisfire instead),
         //  - wait ~700ms of silence before ending so natural pauses don't cut.
-        positiveSpeechThreshold: 0.6,
-        negativeSpeechThreshold: 0.4,
-        minSpeechMs: 300,
-        redemptionMs: 700,
+        positiveSpeechThreshold: options.positiveSpeechThreshold ?? 0.6,
+        negativeSpeechThreshold: options.negativeSpeechThreshold ?? 0.4,
+        minSpeechMs: options.minSpeechMs ?? 300,
+        redemptionMs: options.redemptionMs ?? 700,
+        onSpeechRealStart: options.onSpeechRealStart,
         onSpeechEnd: (audio: Float32Array) => {
           onUtterance(encodeWav(audio, VAD_SAMPLE_RATE));
         },

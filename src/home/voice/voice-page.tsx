@@ -2,8 +2,8 @@
  * VoicePage — standalone `/voice` route for the on-device voice assistant.
  *
  * Independent of the `/home` assistant dashboard: it owns its OWN session
- * scope (a dedicated `VOICE_SESSION_KEY` + `voice` history topic) so voice
- * turns never bleed into the home or chat conversations. The scope is wired
+ * scope (a fresh `voice-*` session for every entry) so voice turns never
+ * bleed into the home or chat conversations. The scope is wired
  * exactly like `HomeAssistantPage` — a `SessionContext.Provider` plus a
  * `ScopedRuntimeBridge` that connects the WS bridge for this session — but
  * the body is just our full-screen `VoiceView` (orb + ominix STT/TTS
@@ -38,12 +38,10 @@ function generateSessionId(): string {
 export function VoicePage() {
   const navigate = useNavigate();
 
-  // Dedicated, persistent voice session — isolated from /home and /chat.
+  // Dedicated, per-entry voice session — isolated from /home and /chat.
   const voiceSessionId = useMemo(() => {
-    const stored = localStorage.getItem(VOICE_SESSION_KEY);
-    if (stored) return stored;
     const id = generateSessionId();
-    localStorage.setItem(VOICE_SESSION_KEY, id);
+    localStorage.removeItem(VOICE_SESSION_KEY);
     return id;
   }, []);
 
