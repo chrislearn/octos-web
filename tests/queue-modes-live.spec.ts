@@ -223,7 +223,8 @@ test.describe("Queue mode live tests", () => {
 
     // Interrupt with a simple question
     console.log("Interrupting with simple question...");
-    await input.fill("What is 2+2? Just the number.");
+    const interruptMarker = "INTERRUPT_OK_731";
+    await input.fill(`Reply with exactly: ${interruptMarker}`);
     await sendBtn.click();
 
     // Wait for the simple answer
@@ -235,7 +236,7 @@ test.describe("Queue mode live tests", () => {
         );
         return Array.from(bubbles).some((el) => {
           const text = (el.textContent || "").trim();
-          return /4/.test(text) || /four/i.test(text);
+          return text.includes("INTERRUPT_OK_731");
         });
       },
       undefined,
@@ -251,7 +252,7 @@ test.describe("Queue mode live tests", () => {
     const hasAnswer = bubbles.some(
       (b) =>
         b.role === "assistant" &&
-        (/4/.test(b.text) || /four/i.test(b.text)),
+        b.text.includes(interruptMarker),
     );
     expect(hasAnswer).toBe(true);
 

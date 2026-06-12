@@ -63,6 +63,10 @@ const mockProfile = {
 
 async function installAdminSettingsMocks(page: import("@playwright/test").Page) {
   let enableBody: unknown = null;
+  let disableBody: unknown = null;
+  let downloadBody: unknown = null;
+  let removeLocalBody: unknown = null;
+  const serviceActions: string[] = [];
 
   await page.route("**/api/auth/status", (route) =>
     route.fulfill({
@@ -153,6 +157,15 @@ async function installAdminSettingsMocks(page: import("@playwright/test").Page) 
             storage: { total_size_display: "1.7 GB" },
             runtime: { memory_required_mb: 4096 },
           },
+          {
+            id: "qwen3-tts",
+            name: "Qwen3 TTS",
+            role: "tts",
+            status: "not_downloaded",
+            category: "speech",
+            storage: { total_size_display: "2.1 GB" },
+            runtime: { memory_required_mb: 4096 },
+          },
         ],
       }),
     }),
@@ -169,6 +182,14 @@ async function installAdminSettingsMocks(page: import("@playwright/test").Page) 
             enabled_for_octos: true,
             role: "asr",
             status: "ready",
+            category: "speech",
+          },
+          {
+            id: "qwen3-tts",
+            name: "Qwen3 TTS",
+            enabled_for_octos: true,
+            role: "tts",
+            status: "not_downloaded",
             category: "speech",
           },
           {
@@ -202,8 +223,46 @@ async function installAdminSettingsMocks(page: import("@playwright/test").Page) 
     });
   });
 
+  await page.route("**/api/admin/platform-skills/ominix-api/models/disable", async (route) => {
+    disableBody = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, message: "disabled" }),
+    });
+  });
+
+  await page.route("**/api/admin/platform-skills/ominix-api/models/download", async (route) => {
+    downloadBody = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, message: "download started" }),
+    });
+  });
+
+  await page.route("**/api/admin/platform-skills/ominix-api/models/remove", async (route) => {
+    removeLocalBody = route.request().postDataJSON();
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ ok: true, message: "removed local model" }),
+    });
+  });
+
+  for (const action of ["start", "stop", "restart"]) {
+    await page.route(`**/api/admin/platform-skills/ominix-api/${action}`, async (route) => {
+      serviceActions.push(action);
+      await route.fulfill({
+        contentType: "application/json",
+        body: JSON.stringify({ ok: true, message: `${action}ed` }),
+      });
+    });
+  }
+
   return {
     getEnableBody: () => enableBody,
+    getDisableBody: () => disableBody,
+    getDownloadBody: () => downloadBody,
+    getRemoveLocalBody: () => removeLocalBody,
+    getServiceActions: () => serviceActions,
   };
 }
 
@@ -676,7 +735,7 @@ test.describe("Settings page — tab smoke tests", () => {
     ).toBeVisible({ timeout: TIMEOUT });
   });
 
-  test("OminiX tab loads platform API data and sends model enable request", async ({
+  test("OminiX tab wires allowlist, download, local remove, and service actions", async ({
     page,
   }) => {
     const mocks = await installAdminSettingsMocks(page);
@@ -692,18 +751,53 @@ test.describe("Settings page — tab smoke tests", () => {
     await expect(page.getByText("Healthy")).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText("LaunchAgent registered")).toBeVisible();
     await expect(page.getByText("Qwen3 ASR").first()).toBeVisible();
+    await expect(page.getByText("Qwen3 TTS").first()).toBeVisible();
+    await expect(
+      page.locator("h3", { hasText: "Enabled Platform Models" }),
+    ).toBeVisible({ timeout: TIMEOUT });
     await expect(page.getByText("ominix-api booted")).toBeVisible();
 
-    await page.getByRole("button", { name: "Enable ASR" }).click();
+    await page.getByRole("button", { name: "Download qwen3-tts" }).first().click();
+    await expect(page.getByText("Download qwen3-tts?")).toBeVisible({
+      timeout: TIMEOUT,
+    });
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect.poll(() => mocks.getDownloadBody()).toEqual({
+      model_id: "qwen3-tts",
+    });
+
+    await page.getByRole("button", { name: "Enable ASR parakeet-asr" }).click();
     await expect.poll(() => mocks.getEnableBody()).toEqual({
       model_id: "parakeet-asr",
       role: "asr",
+    });
+
+    await page.getByRole("button", { name: "Disable qwen3-asr-1.7b" }).first().click();
+    await expect(
+      page.getByText("Disable qwen3-asr-1.7b for Octos?"),
+    ).toBeVisible({ timeout: TIMEOUT });
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect.poll(() => mocks.getDisableBody()).toEqual({
+      model_id: "qwen3-asr-1.7b",
+    });
+
+    await page
+      .getByRole("button", { name: "Remove local model qwen3-asr-1.7b" })
+      .click();
+    await expect(
+      page.getByText("Remove local model qwen3-asr-1.7b?"),
+    ).toBeVisible({ timeout: TIMEOUT });
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect.poll(() => mocks.getRemoveLocalBody()).toEqual({
+      model_id: "qwen3-asr-1.7b",
     });
 
     await page.getByRole("button", { name: "Restart" }).click();
     await expect(
       page.getByText("restart ominix-api service?"),
     ).toBeVisible({ timeout: TIMEOUT });
+    await page.getByRole("button", { name: "Confirm" }).click();
+    await expect.poll(() => mocks.getServiceActions()).toEqual(["restart"]);
   });
 
   test("Server tab uses real admin endpoints for settings and token rotation", async ({

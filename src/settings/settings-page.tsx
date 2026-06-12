@@ -80,7 +80,7 @@ export function AdminSettingsPage() {
 
   return (
     <div className="flex h-screen flex-col bg-surface-dark">
-      <nav className="flex items-center gap-4 px-6 py-4 shrink-0">
+      <nav className="flex shrink-0 items-center gap-4 px-6 py-4 max-md:px-3">
         <button
           onClick={() => navigate(-1)}
           className="rounded-xl p-2 text-muted hover:bg-surface-container hover:text-text-strong transition"
@@ -129,16 +129,16 @@ export function AdminSettingsPage() {
           <Loader2 size={24} className="animate-spin text-muted" />
         </div>
       ) : (
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          <aside className="w-56 shrink-0 border-r border-border/50 px-3 py-4 overflow-y-auto">
-            <div className="space-y-1">
+        <div className="flex min-h-0 flex-1 overflow-hidden max-md:flex-col">
+          <aside className="w-56 shrink-0 overflow-y-auto border-r border-border/50 px-3 py-4 max-md:w-full max-md:overflow-x-auto max-md:overflow-y-hidden max-md:border-b max-md:border-r-0 max-md:py-2">
+            <div className="space-y-1 max-md:flex max-md:min-w-max max-md:gap-2 max-md:space-y-0">
               {TABS.filter(
                 (t) => !t.adminOnly || portal?.can_access_admin_portal,
               ).map(({ id, label, icon: Icon, adminOnly }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
-                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition ${
+                  className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-medium transition max-md:w-auto max-md:shrink-0 max-md:px-3 ${
                     activeTab === id
                       ? "bg-accent/12 text-accent border border-accent/20"
                       : "text-muted hover:bg-surface-container hover:text-text-strong border border-transparent"
@@ -156,7 +156,7 @@ export function AdminSettingsPage() {
             </div>
           </aside>
 
-          <main className="flex-1 min-w-0 overflow-y-auto px-8 py-6">
+          <main className="min-w-0 flex-1 overflow-y-auto px-8 py-6 max-md:px-4 max-md:py-4">
             <div className={`mx-auto ${isAdminOnlyTab ? "max-w-3xl" : "max-w-2xl"}`}>
               {activeTab === "system" && portal?.can_access_admin_portal && <SystemTab />}
               {activeTab === "server" && portal?.can_access_admin_portal && <ServerTab />}
