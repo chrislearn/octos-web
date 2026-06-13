@@ -116,6 +116,8 @@ body {
 .chat-shell {
   position: relative;
   isolation: isolate;
+  background:
+    linear-gradient(180deg, var(--color-surface-dark), var(--color-surface));
 }
 
 .chat-shell::before {
@@ -126,6 +128,72 @@ body {
   pointer-events: none;
   background: transparent;
   opacity: 0.9;
+}
+
+.chat-sidebar-panel,
+.chat-main-panel {
+  border-color: color-mix(in srgb, var(--color-border) 82%, var(--color-accent) 18%);
+  background: color-mix(in srgb, var(--color-surface) 90%, var(--color-surface-container) 10%);
+}
+
+.chat-panel-toolbar {
+  border-color: color-mix(in srgb, var(--color-border) 80%, var(--color-accent) 20%);
+  background: color-mix(in srgb, var(--color-surface-container) 76%, var(--color-surface-elevated) 24%);
+}
+
+.chat-sidebar-footer {
+  background: color-mix(in srgb, var(--color-surface-container) 80%, transparent);
+}
+
+.chat-thread-viewport {
+  scroll-padding-block: 1.5rem;
+}
+
+.chat-thread-inner {
+  width: min(100%, 56rem);
+}
+
+.chat-message-row {
+  padding-inline: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.chat-user-bubble-stack {
+  max-width: min(42rem, 78%);
+}
+
+.chat-assistant-bubble {
+  max-width: min(46rem, 86%);
+}
+
+.chat-empty-card {
+  border-color: color-mix(in srgb, var(--color-accent) 20%, var(--color-border) 80%);
+  background: color-mix(in srgb, var(--color-surface-container) 72%, transparent);
+}
+
+.chat-composer-wrap {
+  padding-inline: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.chat-composer-frame {
+  border-color: color-mix(in srgb, var(--color-border) 76%, var(--color-accent) 24%);
+  background: color-mix(in srgb, var(--color-surface-elevated) 86%, var(--color-surface-container) 14%);
+}
+
+.chat-composer-frame:focus-within {
+  border-color: color-mix(in srgb, var(--color-accent) 54%, var(--color-border) 46%);
+}
+
+.chat-composer-input {
+  min-height: 2.5rem;
+  line-height: 1.55;
+}
+
+.chat-composer-toolbar {
+  min-height: 2.35rem;
+}
+
+.chat-file-preview {
+  background: color-mix(in srgb, var(--color-surface-container) 78%, var(--color-surface-elevated) 22%);
 }
 
 .glass-panel,
@@ -600,6 +668,82 @@ body {
 
 [data-theme="light"] .message-card-assistant {
   background: color-mix(in srgb, white 78%, var(--color-surface-container) 22%);
+}
+
+[data-theme="light"] .chat-shell {
+  background:
+    linear-gradient(180deg, var(--color-surface-light), var(--color-surface));
+}
+
+[data-theme="light"] .chat-sidebar-panel,
+[data-theme="light"] .chat-main-panel {
+  background: color-mix(in srgb, var(--color-surface) 82%, white 18%);
+}
+
+[data-theme="light"] .chat-panel-toolbar,
+[data-theme="light"] .chat-composer-frame {
+  background: color-mix(in srgb, white 82%, var(--color-surface-container) 18%);
+}
+
+@media (max-width: 720px) {
+  .chat-shell {
+    height: auto;
+    min-height: 100vh;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .chat-shell > .panel-resize-handle,
+  .chat-content-region > .panel-resize-handle {
+    display: none;
+  }
+
+  .chat-sidebar-panel {
+    width: 100% !important;
+    min-height: 15rem;
+    max-height: 18rem;
+  }
+
+  .chat-content-region {
+    min-height: 35rem;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+
+  .chat-main-panel {
+    min-height: 35rem;
+  }
+
+  .chat-content-region.has-media-panel {
+    min-height: auto;
+  }
+
+  .chat-content-region.has-media-panel .chat-main-panel {
+    flex: 0 0 24rem;
+    min-height: 24rem;
+  }
+
+  .chat-media-panel-wrap {
+    width: 100% !important;
+    min-height: 18rem;
+  }
+
+  .chat-panel-toolbar {
+    padding: 0.9rem 1rem;
+  }
+
+  .chat-message-row {
+    padding-inline: 0.75rem;
+  }
+
+  .chat-user-bubble-stack,
+  .chat-assistant-bubble {
+    max-width: 92%;
+  }
+
+  .chat-composer-wrap {
+    padding: 0.5rem 0.75rem 0.75rem;
+  }
 }
 
 /* ── Scrollbar ──────────────────────────────────────── */

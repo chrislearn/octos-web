@@ -72,14 +72,14 @@ export function UserBubbleShell({
     <div
       data-testid={outerTestId}
       {...spreadDataAttributes(outerDataAttributes)}
-      className="flex justify-end px-4 py-3"
+      className="chat-message-row chat-message-row-user flex justify-end py-3"
     >
-      <div className="flex max-w-[74%] flex-col items-end">
+      <div className="chat-user-bubble-stack flex flex-col items-end">
         {showText && (
           <div
             data-testid={textTestId}
             {...spreadDataAttributes(textDataAttributes)}
-            className="message-card message-card-user rounded-[14px] rounded-br-[4px] px-4 py-2.5 text-sm leading-relaxed text-text"
+            className="chat-user-bubble message-card message-card-user rounded-[14px] rounded-br-[4px] px-4 py-2.5 text-sm leading-relaxed text-text"
           >
             {text}
           </div>
