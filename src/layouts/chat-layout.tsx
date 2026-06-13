@@ -1,7 +1,6 @@
 import { type ReactNode, useState, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "@/auth/auth-context";
 import { useOctosStatus } from "@/hooks/use-octos-status";
-import { useTheme } from "@/hooks/use-theme";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { CostBar } from "@/components/cost-bar";
 import { RouterModeSwitcher } from "@/components/router-mode-switcher";
@@ -17,7 +16,11 @@ import {
   useContentViewer,
   ContentViewerOverlay,
 } from "@/components/content-viewer";
-import { LogOut, Sun, Moon, Settings, PanelRight } from "lucide-react";
+import {
+  WorkbenchStatusPill,
+  WorkbenchThemeButton,
+} from "@/components/workbench-shell";
+import { LogOut, Settings, PanelRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useFileStore } from "@/store/file-store";
 
@@ -41,7 +44,6 @@ export function ChatLayout({ children }: { children: ReactNode }) {
   const { sessions, currentSessionId, currentSessionTitle, historyTopic, renameSession } =
     useSession();
   const status = useOctosStatus();
-  const { theme, toggleTheme } = useTheme();
   const [mediaPanelOpen, setMediaPanelOpen] = useState(false);
   const sessionFiles = useFileStore(currentSessionId);
   const sessionLabels = useMemo(
@@ -102,27 +104,30 @@ export function ChatLayout({ children }: { children: ReactNode }) {
       {/* Sidebar */}
       <aside
         style={{ width: historyPanelWidth }}
-        className="sidebar-scope glass-panel animate-shell-rise flex shrink-0 flex-col overflow-hidden rounded-lg"
+        className="sidebar-scope chat-sidebar-panel glass-panel animate-shell-rise flex shrink-0 flex-col overflow-hidden rounded-lg"
       >
         {/* Header */}
         <div className="px-3 pt-3">
-          <div className="glass-toolbar px-4 py-4">
+          <div className="chat-panel-toolbar glass-toolbar px-4 py-4">
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
-                <div className="shell-kicker">Octos Workspace</div>
-                <div className="mt-1 text-xl font-semibold tracking-tight text-text-strong">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <img
+                    src="/images/octos-logo-color.svg"
+                    alt="Octos"
+                    className="h-6 w-auto shrink-0 select-none"
+                  />
+                  <span className="truncate text-sm font-semibold text-text-strong">
+                    Octos
+                  </span>
+                </div>
+                <div className="shell-kicker mt-4">Session Stack</div>
+                <div className="mt-1 text-lg font-semibold tracking-tight text-text-strong">
                   Chat History
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={toggleTheme}
-                  className="glass-icon-button p-2.5"
-                  title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                  aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                >
-                  {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-                </button>
+                <WorkbenchThemeButton />
               </div>
             </div>
           </div>
@@ -133,10 +138,13 @@ export function ChatLayout({ children }: { children: ReactNode }) {
 
         {/* Footer */}
         <div className="px-3 pb-3 pt-2">
-          <div className="glass-section rounded-lg px-4 py-3">
+          <div className="chat-sidebar-footer glass-section rounded-lg px-4 py-3">
             {status && status.model && status.model !== "none" && (
-              <div className="mb-2 text-[11px] text-muted/75">
-                {status.provider !== "none" ? `${status.provider}/` : ""}{status.model}
+              <div className="mb-2">
+                <WorkbenchStatusPill>
+                  {status.provider !== "none" ? `${status.provider}/` : ""}
+                  {status.model}
+                </WorkbenchStatusPill>
               </div>
             )}
             {user && (
@@ -171,11 +179,15 @@ export function ChatLayout({ children }: { children: ReactNode }) {
       />
 
       {/* Main + Media Panel */}
-      <div className="flex flex-1 min-w-0 min-h-0 gap-2">
-        <main className="glass-panel animate-shell-rise flex flex-1 min-w-0 flex-col min-h-0 overflow-hidden rounded-lg">
+      <div
+        className={`chat-content-region flex flex-1 min-w-0 min-h-0 gap-2 ${
+          mediaPanelOpen ? "has-media-panel" : ""
+        }`}
+      >
+        <main className="chat-main-panel glass-panel animate-shell-rise flex flex-1 min-w-0 flex-col min-h-0 overflow-hidden rounded-lg">
           {/* Top bar with title + cost + files toggle */}
           <div className="px-3 pt-3">
-            <div className="glass-toolbar px-4 py-4">
+            <div className="chat-panel-toolbar glass-toolbar px-4 py-4">
               <div className="flex items-start gap-4">
                 <div className="min-w-0 flex-1">
                   <div className="shell-kicker">Current Session</div>
@@ -238,7 +250,7 @@ export function ChatLayout({ children }: { children: ReactNode }) {
             />
             <div
               style={{ width: effectiveWidth }}
-              className="animate-shell-rise shrink-0 overflow-hidden transition-[width,opacity,transform] duration-200 ease-out"
+              className="chat-media-panel-wrap animate-shell-rise shrink-0 overflow-hidden transition-[width,opacity,transform] duration-200 ease-out"
             >
               <ContentBrowser
                 open={mediaPanelOpen}

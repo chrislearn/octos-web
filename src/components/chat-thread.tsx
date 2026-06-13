@@ -861,11 +861,11 @@ export const ThreadAssistantBubble = memo(function ThreadAssistantBubble({
     (tc) => tc.progress.length > 0,
   );
   return (
-    <div className="flex px-4 py-3">
+    <div className="chat-message-row chat-message-row-assistant flex py-3">
       <div
         data-testid="assistant-message"
         data-thread-id={tid}
-        className="group/assistant message-card message-card-assistant animate-shell-rise max-w-[88%] rounded-[14px] rounded-bl-[4px] px-4 py-3 text-sm leading-relaxed text-text"
+        className="chat-assistant-bubble group/assistant message-card message-card-assistant animate-shell-rise rounded-[14px] rounded-bl-[4px] px-4 py-3 text-sm leading-relaxed text-text"
       >
         {message.text ? (
           <MarkdownContent
@@ -1149,9 +1149,9 @@ function ThreadList({
       data-testid="chat-thread"
       data-thread-renderer="v2"
       ref={viewportRef}
-      className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
+      className="chat-thread-viewport flex-1 min-h-0 overflow-y-auto overscroll-contain"
     >
-      <div className="mx-auto max-w-4xl py-6">
+      <div className="chat-thread-inner mx-auto max-w-4xl py-6">
         {threads.map((thread) => (
           <ThreadView
             key={thread.id}
@@ -1251,7 +1251,7 @@ function ChatThreadV2({
         />
       ) : (
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-6">
-          <div className="glass-section animate-shell-rise max-w-xl rounded-[12px] px-7 py-9 text-center">
+          <div className="chat-empty-card glass-section animate-shell-rise max-w-xl rounded-[12px] px-7 py-9 text-center">
             <div className="shell-kicker">Conversation Studio</div>
             <h1 className="mb-3 mt-3 text-3xl font-light tracking-tight text-text-strong">
               What can I help with?
@@ -1347,11 +1347,9 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
   // Recording timer
   useEffect(() => {
     if (recording) {
-      setRecordingTime(0);
       timerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000);
     } else {
       if (timerRef.current) clearInterval(timerRef.current);
-      setRecordingTime(0);
     }
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -1422,6 +1420,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
       };
       recorder.start(1000);
       mediaRecorderRef.current = recorder;
+      setRecordingTime(0);
       setRecording(mode);
     } catch (e) {
       setCmdFeedback(
@@ -1436,6 +1435,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
       mediaRecorderRef.current.stop();
     }
     mediaRecorderRef.current = null;
+    setRecordingTime(0);
     setRecording(null);
   }, []);
 
@@ -1463,7 +1463,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
       setCmdFeedback(`Camera failed: ${e instanceof Error ? e.message : "permission denied"}`);
       setTimeout(() => setCmdFeedback(null), 4000);
     }
-  }, []);
+  }, [cameraStream]);
 
   useEffect(() => {
     if (cameraStream && cameraPreviewRef.current) {
@@ -1860,7 +1860,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
 
   return (
     <div
-      className="px-4 pb-6 pt-2"
+      className="chat-composer-wrap pb-6 pt-2"
       onPaste={handlePaste}
     >
       <div
@@ -1945,7 +1945,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
         {pendingFiles.length > 0 && (
           <div className="mb-3 flex flex-wrap items-center gap-2.5">
             {pendingFiles.map((pf, i) => (
-              <div key={i} className="message-attachment-card animate-shell-rise relative group rounded-[10px] p-1.5">
+              <div key={i} className="chat-file-preview message-attachment-card animate-shell-rise relative group rounded-[10px] p-1.5">
                 {pf.preview && pf.file.type.startsWith("image/") ? (
                   <img src={pf.preview} alt={pf.file.name} className="h-16 w-16 rounded-[8px] object-cover" />
                 ) : pf.preview && pf.file.type.startsWith("video/") ? (
@@ -1971,7 +1971,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
             ))}
           </div>
         )}
-        <div className="composer-shell animate-shell-rise flex flex-col rounded-[12px] p-2">
+        <div className="chat-composer-frame composer-shell animate-shell-rise flex flex-col rounded-[12px] p-2">
           <input
             ref={fileInputRef}
             type="file"
@@ -1998,7 +1998,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
               onCompositionStart={() => { composingRef.current = true; }}
               onCompositionEnd={() => { composingRef.current = false; }}
               rows={1}
-              className="flex-1 resize-none bg-transparent px-3 py-2 text-sm text-text placeholder-muted/60 outline-none"
+              className="chat-composer-input flex-1 resize-none bg-transparent px-3 py-2 text-sm text-text placeholder-muted/60 outline-none"
               autoFocus
             />
             <button
@@ -2008,7 +2008,7 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
               // Issue #112.3: also disable while a send is in flight
               // so a quick second click cannot race the first.
               disabled={(isEmpty && pendingFiles.length === 0) || sending}
-              className={`flex shrink-0 items-center justify-center rounded-[10px] disabled:opacity-30 ${
+              className={`chat-send-button flex shrink-0 items-center justify-center rounded-[10px] disabled:opacity-30 ${
                 pendingFiles.length > 0
                   ? "h-10 gap-1.5 px-4 bg-green-600 text-white hover:bg-green-700"
                   : "h-10 w-10 bg-accent text-white hover:bg-accent-dim"
@@ -2030,14 +2030,14 @@ function Composer({ mountGhost, unmountGhost }: ComposerProps) {
                 data-testid="cancel-button"
                 aria-label="Cancel"
                 onClick={handleCancel}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-red-600 text-white hover:bg-red-700"
+                className="chat-stop-button flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-red-600 text-white hover:bg-red-700"
               >
                 <Square size={16} />
               </button>
             )}
           </div>
           {/* Bottom row: media buttons */}
-          <div className="composer-toolbar mt-2 flex items-center gap-0.5 px-1 pt-2">
+          <div className="chat-composer-toolbar composer-toolbar mt-2 flex items-center gap-0.5 px-1 pt-2">
             <button
               data-testid="attach-button"
               aria-label="Attach file"
