@@ -200,4 +200,38 @@ test.describe("UI redesign shell smoke", () => {
       }
     });
   }
+
+  test("home shell exposes the shared route navigation", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/", { waitUntil: "networkidle" });
+
+    for (const label of [
+      "Home",
+      "Chat",
+      "Slides",
+      "Sites",
+      "Display",
+      "Voice",
+      "Settings",
+    ]) {
+      await expect(
+        page.getByRole("link", { name: label, exact: true }),
+      ).toBeVisible();
+    }
+  });
+
+  test("workspace surfaces use the shared topbar titles", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    for (const surface of [
+      { path: "/settings", context: "Octos Control", title: "Settings" },
+      { path: "/slides", context: "Creation Workspace", title: "Slides" },
+      { path: "/sites", context: "Creation Workspace", title: "Site Studio" },
+    ]) {
+      await page.goto(surface.path, { waitUntil: "networkidle" });
+      await expect(page.getByText(surface.context).first()).toBeVisible();
+      await expect(page.getByRole("heading", { name: surface.title })).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+    }
+  });
 });
