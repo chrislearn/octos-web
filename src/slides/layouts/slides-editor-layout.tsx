@@ -1,13 +1,9 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  ArrowLeft,
   FolderOpen,
   MessageSquare,
-  Moon,
   Presentation,
-  Sun,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 import type { ContentEntry } from "@/api/content";
 import {
@@ -17,7 +13,11 @@ import {
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
 import { useSlides } from "../context/slides-context";
 import { ProjectFiles } from "../components/project-files";
-import { useTheme } from "@/hooks/use-theme";
+import {
+  WorkbenchStatusPill,
+  WorkbenchThemeButton,
+  WorkbenchTopbar,
+} from "@/components/workbench-shell";
 
 export function SlidesEditorLayout({
   previewPanel,
@@ -35,7 +35,6 @@ export function SlidesEditorLayout({
   const [showChat, setShowChat] = useState(true);
   const [showFiles, setShowFiles] = useState(true);
   const { project, save } = useSlides();
-  const { theme, toggleTheme } = useTheme();
   const [editingTitle, setEditingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -131,63 +130,48 @@ export function SlidesEditorLayout({
 
   return (
     <div className="chat-shell workbench-shell flex h-screen flex-col gap-2 p-2">
-      {/* Header */}
-      <div className="glass-panel rounded-lg p-2">
-        <div className="glass-toolbar flex flex-wrap items-center justify-between gap-4 px-4 py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <Link
-              to="/slides"
-              className="glass-icon-button flex items-center gap-1.5 px-3 py-2 text-sm"
-            >
-              <ArrowLeft size={16} />
-              Back
-            </Link>
-            <div className="h-8 w-px self-stretch bg-border" />
-            <div className="workbench-icon-tile flex h-10 w-10 items-center justify-center text-accent">
-              <Presentation size={16} />
-            </div>
-            <div className="min-w-0">
-              <div className="shell-kicker">Slides Workspace</div>
-              {editingTitle ? (
-                <input
-                  ref={titleInputRef}
-                  defaultValue={project?.title || ""}
-                  className="workbench-input mt-1 max-w-sm px-3 py-2 text-lg font-semibold tracking-tight"
-                  autoFocus
-                  onBlur={(e) => {
-                    const v = e.target.value.trim();
-                    if (v && v !== project?.title) save({ title: v });
-                    setEditingTitle(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") e.currentTarget.blur();
-                    if (e.key === "Escape") setEditingTitle(false);
-                  }}
-                />
-              ) : (
-                <span
-                  className="block max-w-sm truncate text-lg font-semibold tracking-tight text-text-strong transition hover:text-accent"
-                  onClick={() => setEditingTitle(true)}
-                  title="Click to rename"
-                >
-                  {project?.title || "Untitled Deck"}
-                </span>
-              )}
-            </div>
-            {project && (
-              <span className="workbench-badge px-3 py-1.5 text-xs">
-                {project.slides.length} slides
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
+      <WorkbenchTopbar
+        backTo="/slides"
+        icon={Presentation}
+        context="Slides Workspace"
+        title={
+          editingTitle ? (
+            <input
+              ref={titleInputRef}
+              defaultValue={project?.title || ""}
+              className="workbench-input max-w-sm px-3 py-2 text-lg font-semibold tracking-tight"
+              autoFocus
+              onBlur={(e) => {
+                const v = e.target.value.trim();
+                if (v && v !== project?.title) save({ title: v });
+                setEditingTitle(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") setEditingTitle(false);
+              }}
+            />
+          ) : (
             <button
-              onClick={toggleTheme}
-              className="glass-icon-button p-2.5"
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              type="button"
+              className="block max-w-sm truncate text-left transition hover:text-accent"
+              onClick={() => setEditingTitle(true)}
+              title="Click to rename"
             >
-              {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+              {project?.title || "Untitled Deck"}
             </button>
+          )
+        }
+        badge={
+          project ? (
+            <WorkbenchStatusPill>
+              {project.slides.length} slides
+            </WorkbenchStatusPill>
+          ) : undefined
+        }
+        actions={
+          <>
+            <WorkbenchThemeButton />
             <button
               onClick={() => setShowChat(!showChat)}
               className={`glass-icon-button p-2.5 ${
@@ -206,9 +190,9 @@ export function SlidesEditorLayout({
             >
               <FolderOpen size={16} />
             </button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Layout: chat (left) + preview (center) + files (right) */}
       <div className="flex flex-1 min-h-0 gap-2 overflow-hidden max-lg:flex-col max-lg:overflow-y-auto">

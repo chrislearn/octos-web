@@ -1,11 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/auth-context";
-import { useTheme } from "@/hooks/use-theme";
 import {
-  ArrowLeft,
-  Sun,
-  Moon,
   User,
   Cpu,
   Puzzle,
@@ -17,7 +13,14 @@ import {
   Server,
   Waves,
   Loader2,
+  Settings as SettingsIcon,
 } from "lucide-react";
+import {
+  WorkbenchPage,
+  WorkbenchStatusPill,
+  WorkbenchThemeButton,
+  WorkbenchTopbar,
+} from "@/components/workbench-shell";
 import { getMyProfile, type Profile } from "./settings-api";
 import { ProfileTab } from "./profile-tab";
 import { LlmTab } from "./llm-tab";
@@ -53,9 +56,8 @@ const TABS: TabDef[] = [
 ];
 
 export function AdminSettingsPage() {
-  const navigate = useNavigate();
   const { portal } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,52 +81,32 @@ export function AdminSettingsPage() {
   const isAdminOnlyTab = activeTab === "system" || activeTab === "server" || activeTab === "users" || activeTab === "ominix";
 
   return (
-    <div className="workbench-shell flex h-screen flex-col">
-      <nav className="workbench-topbar flex shrink-0 items-center gap-4 px-5 py-3 max-md:px-3">
-        <button
-          onClick={() => navigate(-1)}
-          className="glass-icon-button p-2"
-          title="Go back"
-          aria-label="Go back"
-        >
-          <ArrowLeft size={18} />
-        </button>
-        <div className="flex items-center gap-2.5">
-          <img
-            src="/images/octos-logo-color.svg"
-            alt="Octos"
-            className="h-6 w-auto select-none"
-          />
-          <span className="text-base font-semibold tracking-tight text-text-strong">
-            Settings
-          </span>
-        </div>
-
-        <div className="flex-1" />
-
-        {accessibleProfiles.length > 1 && (
-          <select
-            value={selectedProfileId}
-            onChange={(e) => setSelectedProfileId(e.target.value)}
-            className="workbench-input px-3 py-2 text-sm"
-          >
-            {accessibleProfiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name || p.id}
-              </option>
-            ))}
-          </select>
-        )}
-
-        <button
-          onClick={toggleTheme}
-          className="glass-icon-button p-2.5"
-          title={theme === "dark" ? "Light mode" : "Dark mode"}
-          aria-label={theme === "dark" ? "Light mode" : "Dark mode"}
-        >
-          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
-      </nav>
+    <WorkbenchPage>
+      <WorkbenchTopbar
+        onBack={() => navigate(-1)}
+        icon={SettingsIcon}
+        context="Octos Control"
+        title="Settings"
+        subtitle="Profile, models, channels, operators, and local runtime"
+        actions={
+          <>
+            {accessibleProfiles.length > 1 && (
+              <select
+                value={selectedProfileId}
+                onChange={(e) => setSelectedProfileId(e.target.value)}
+                className="workbench-input px-3 py-2 text-sm"
+              >
+                {accessibleProfiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name || p.id}
+                  </option>
+                ))}
+              </select>
+            )}
+            <WorkbenchThemeButton />
+          </>
+        }
+      />
 
       {loading ? (
         <div className="flex flex-1 items-center justify-center">
@@ -149,8 +131,8 @@ export function AdminSettingsPage() {
                   <Icon size={16} />
                   {label}
                   {adminOnly && (
-                    <span className="workbench-badge ml-auto px-1.5 py-0.5 text-[9px] text-accent/80">
-                      Admin
+                    <span className="ml-auto">
+                      <WorkbenchStatusPill tone="accent">Admin</WorkbenchStatusPill>
                     </span>
                   )}
                 </button>
@@ -194,6 +176,6 @@ export function AdminSettingsPage() {
           </main>
         </div>
       )}
-    </div>
+    </WorkbenchPage>
   );
 }

@@ -1,13 +1,25 @@
 import { useNavigate } from "react-router-dom";
 import { HomeNav } from "@/components/home-nav";
-import { MessageSquare, ArrowRight, Presentation, Globe, MonitorSmartphone, Mic } from "lucide-react";
+import {
+  Globe,
+  MessageSquare,
+  Mic,
+  MonitorSmartphone,
+  Presentation,
+} from "lucide-react";
 import { unlockAudio } from "@/home/voice/audio-playback";
+import {
+  WorkbenchPage,
+  WorkbenchRouteCard,
+  WorkbenchSectionHeader,
+  WorkbenchStatusPill,
+} from "@/components/workbench-shell";
 
 export function HomePage() {
   const navigate = useNavigate();
 
   return (
-    <div className="workbench-shell flex h-screen flex-col">
+    <WorkbenchPage>
       <HomeNav />
 
       <div className="flex-1 overflow-y-auto">
@@ -18,101 +30,68 @@ export function HomePage() {
               <h1 className="mt-2 text-2xl font-semibold tracking-tight text-text-strong">
                 Octos Workspace
               </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
+                Chat, generate decks, scaffold sites, and operate local voice
+                workflows from one compact control surface.
+              </p>
             </div>
-            <div className="workbench-badge px-2.5 py-1.5">AI workbench</div>
+            <WorkbenchStatusPill tone="accent">AI workbench</WorkbenchStatusPill>
           </header>
 
           <section>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-text-strong">Workspaces</h2>
-              <span className="text-xs text-muted">Chat, decks, sites</span>
-            </div>
+            <WorkbenchSectionHeader
+              title="Workspaces"
+              description="Primary production surfaces"
+            />
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <button
-              onClick={() => navigate("/chat")}
-              className="workbench-card flex min-h-28 items-center gap-4 p-5 text-left"
-            >
-              <div className="workbench-icon-tile flex h-11 w-11 shrink-0 items-center justify-center">
-                <MessageSquare size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-strong">Start chat</div>
-                <div className="mt-1 text-xs text-muted">Session workspace</div>
-              </div>
-              <ArrowRight size={16} className="ml-auto shrink-0 text-muted" />
-            </button>
-            <button
-              onClick={() => navigate("/slides")}
-              className="workbench-card flex min-h-28 items-center gap-4 p-5 text-left"
-            >
-              <div className="workbench-icon-tile flex h-11 w-11 shrink-0 items-center justify-center">
-                <Presentation size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-strong">Slides</div>
-                <div className="mt-1 text-xs text-muted">Deck workspace</div>
-              </div>
-              <ArrowRight size={16} className="ml-auto shrink-0 text-muted" />
-            </button>
-            <button
-              onClick={() => navigate("/sites")}
-              className="workbench-card flex min-h-28 items-center gap-4 p-5 text-left"
-            >
-              <div className="workbench-icon-tile flex h-11 w-11 shrink-0 items-center justify-center">
-                <Globe size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-strong">Sites</div>
-                <div className="mt-1 text-xs text-muted">Site workspace</div>
-              </div>
-              <ArrowRight size={16} className="ml-auto shrink-0 text-muted" />
-            </button>
+              <WorkbenchRouteCard
+                icon={MessageSquare}
+                title="Start chat"
+                description="Session workspace"
+                to="/chat"
+              />
+              <WorkbenchRouteCard
+                icon={Presentation}
+                title="Slides"
+                description="Deck workspace"
+                to="/slides"
+              />
+              <WorkbenchRouteCard
+                icon={Globe}
+                title="Sites"
+                description="Site workspace"
+                to="/sites"
+              />
             </div>
           </section>
 
           <section>
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-text-strong">Utilities</h2>
-              <span className="text-xs text-muted">Display and voice</span>
-            </div>
+            <WorkbenchSectionHeader
+              title="Utilities"
+              description="Ambient display and hands-free voice"
+            />
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <button
-              onClick={() => navigate("/home")}
-              className="workbench-card flex min-h-24 w-full items-center gap-4 p-5 text-left"
-            >
-              <div className="workbench-icon-tile flex h-11 w-11 shrink-0 items-center justify-center">
-                <MonitorSmartphone size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-strong">Home Assistant</div>
-                <div className="mt-1 text-xs text-muted">Ambient display</div>
-              </div>
-              <ArrowRight size={16} className="ml-auto shrink-0 text-muted" />
-            </button>
-
-            <button
-              onClick={() => {
-                // Unlock the Web Audio context INSIDE this click gesture so the
-                // voice reply (which arrives seconds later, off-gesture) can
-                // play — browser autoplay policy blocks a later resume().
-                unlockAudio();
-                navigate("/voice");
-              }}
-              className="workbench-card flex min-h-24 w-full items-center gap-4 p-5 text-left"
-            >
-              <div className="workbench-icon-tile flex h-11 w-11 shrink-0 items-center justify-center">
-                <Mic size={24} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-medium text-text-strong">Voice</div>
-                <div className="mt-1 text-xs text-muted">Hands-free session</div>
-              </div>
-              <ArrowRight size={16} className="ml-auto shrink-0 text-muted" />
-            </button>
+              <WorkbenchRouteCard
+                icon={MonitorSmartphone}
+                title="Home Assistant"
+                description="Ambient display"
+                to="/home"
+              />
+              <WorkbenchRouteCard
+                icon={Mic}
+                title="Voice"
+                description="Hands-free session"
+                onClick={() => {
+                  // Unlock the Web Audio context inside this click gesture so
+                  // the voice reply can play after the async response arrives.
+                  unlockAudio();
+                  navigate("/voice");
+                }}
+              />
             </div>
           </section>
         </div>
       </div>
-    </div>
+    </WorkbenchPage>
   );
 }

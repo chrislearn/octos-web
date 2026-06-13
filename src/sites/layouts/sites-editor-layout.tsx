@@ -1,11 +1,14 @@
 import { useCallback, useRef, useState } from "react";
-import { ArrowLeft, FolderOpen, Globe, MessageSquare, Moon, Sun } from "lucide-react";
-import { Link } from "react-router-dom";
+import { FolderOpen, Globe, MessageSquare } from "lucide-react";
 
 import type { ContentEntry } from "@/api/content";
 import { ContentViewerOverlay, type ViewerState } from "@/components/content-viewer";
 import { useResizablePanel } from "@/hooks/use-resizable-panel";
-import { useTheme } from "@/hooks/use-theme";
+import {
+  WorkbenchStatusPill,
+  WorkbenchThemeButton,
+  WorkbenchTopbar,
+} from "@/components/workbench-shell";
 
 import { useSites } from "../context/sites-context";
 import { ProjectFiles } from "../components/project-files";
@@ -21,7 +24,6 @@ export function SitesEditorLayout({
   const [showChat, setShowChat] = useState(true);
   const [showFiles, setShowFiles] = useState(true);
   const { project, save } = useSites();
-  const { theme, toggleTheme } = useTheme();
   const [editingTitle, setEditingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const {
@@ -98,29 +100,21 @@ export function SitesEditorLayout({
   }
 
   const projectStatus = project?.scaffoldError
-    ? { label: "Error", className: "bg-red-500/10 text-red-300" }
+    ? { label: "Error", tone: "danger" as const }
     : !project?.scaffolded
-      ? { label: "Scaffolding", className: "bg-amber-500/10 text-amber-300" }
+      ? { label: "Scaffolding", tone: "warning" as const }
       : project?.previewUrl
-        ? { label: "HTTPS Preview", className: "bg-emerald-500/10 text-emerald-300" }
-        : { label: "Ready", className: "bg-surface-container text-muted" };
+        ? { label: "HTTPS Preview", tone: "success" as const }
+        : { label: "Ready", tone: "default" as const };
 
   return (
     <div className="workbench-shell flex h-screen flex-col">
-      <div className="workbench-topbar flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Link
-            to="/sites"
-            className="glass-icon-button flex items-center gap-1.5 px-3 py-2 text-sm"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </Link>
-          <div className="h-5 w-px bg-border" />
-          <div className="workbench-icon-tile flex h-9 w-9 items-center justify-center">
-            <Globe size={16} />
-          </div>
-          {editingTitle ? (
+      <WorkbenchTopbar
+        backTo="/sites"
+        icon={Globe}
+        context="Site Workspace"
+        title={
+          editingTitle ? (
             <input
               ref={titleInputRef}
               defaultValue={project?.title || ""}
@@ -137,62 +131,57 @@ export function SitesEditorLayout({
               }}
             />
           ) : (
-            <span
-              className="max-w-sm cursor-pointer truncate text-sm font-medium text-text-strong transition hover:text-accent"
+            <button
+              type="button"
+              className="max-w-sm truncate text-left transition hover:text-accent"
               onClick={() => setEditingTitle(true)}
               title="Click to rename"
             >
               {project?.title || "Untitled Site"}
-            </span>
-          )}
-          {project && (
-            <span className="workbench-badge px-2 py-0.5 text-xs">
-              {project.template}
-            </span>
-          )}
-          {project && (
-            <span className={`rounded-md px-2 py-0.5 text-xs ${projectStatus.className}`}>
-              {projectStatus.label}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3">
-          {project?.id && (
-            <SitesTaskStatusIndicator
-              sessionId={project.id}
-              historyTopic={project.preset ? `site ${project.preset}` : undefined}
-              profileId={project.profileId}
-            />
-          )}
-          <div className="flex items-center gap-1">
-          <button
-            onClick={toggleTheme}
-            className="glass-icon-button p-2"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
-          </button>
-          <button
-            onClick={() => setShowChat((value) => !value)}
-            className={`glass-icon-button p-2 ${
-              showChat ? "is-active" : ""
-            }`}
-            title="Toggle chat"
-          >
-            <MessageSquare size={16} />
-          </button>
-          <button
-            onClick={() => setShowFiles((value) => !value)}
-            className={`glass-icon-button p-2 ${
-              showFiles ? "is-active" : ""
-            }`}
-            title="Toggle files"
-          >
-            <FolderOpen size={16} />
-          </button>
-          </div>
-        </div>
-      </div>
+            </button>
+          )
+        }
+        badge={
+          project ? (
+            <>
+              <WorkbenchStatusPill>{project.template}</WorkbenchStatusPill>
+              <WorkbenchStatusPill tone={projectStatus.tone}>
+                {projectStatus.label}
+              </WorkbenchStatusPill>
+            </>
+          ) : undefined
+        }
+        actions={
+          <>
+            {project?.id && (
+              <SitesTaskStatusIndicator
+                sessionId={project.id}
+                historyTopic={project.preset ? `site ${project.preset}` : undefined}
+                profileId={project.profileId}
+              />
+            )}
+            <WorkbenchThemeButton />
+            <button
+              onClick={() => setShowChat((value) => !value)}
+              className={`glass-icon-button p-2 ${
+                showChat ? "is-active" : ""
+              }`}
+              title="Toggle chat"
+            >
+              <MessageSquare size={16} />
+            </button>
+            <button
+              onClick={() => setShowFiles((value) => !value)}
+              className={`glass-icon-button p-2 ${
+                showFiles ? "is-active" : ""
+              }`}
+              title="Toggle files"
+            >
+              <FolderOpen size={16} />
+            </button>
+          </>
+        }
+      />
 
       <div className="flex min-h-0 flex-1 gap-2 overflow-hidden p-2 max-lg:flex-col max-lg:overflow-y-auto">
         {showChat && (

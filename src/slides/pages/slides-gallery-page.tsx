@@ -1,10 +1,16 @@
 import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Presentation, Plus, Search, ArrowLeft } from "lucide-react";
+import { Presentation, Plus, Search } from "lucide-react";
 
 import { AuthenticatedFileImage } from "../components/authenticated-file-image";
 import { useSlidesProjects, searchSlidesProjects } from "../store";
 import { TEMPLATES, TEMPLATE_COLORS } from "../constants";
+import {
+  WorkbenchPage,
+  WorkbenchSectionHeader,
+  WorkbenchStatusPill,
+  WorkbenchTopbar,
+} from "@/components/workbench-shell";
 
 export function SlidesGalleryPage() {
   const { projects, create } = useSlidesProjects();
@@ -46,23 +52,20 @@ export function SlidesGalleryPage() {
   };
 
   return (
-    <div className="workbench-shell min-h-screen">
-      {/* Header */}
-      <div className="workbench-topbar">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4 max-sm:px-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <Link to="/" className="glass-icon-button flex h-9 w-9 items-center justify-center">
-              <ArrowLeft size={16} />
-            </Link>
-            <div className="workbench-icon-tile flex h-9 w-9 items-center justify-center">
-              <Presentation size={18} />
-            </div>
-            <h1 className="truncate text-lg font-semibold text-text-strong">Slides Gallery</h1>
-            <span className="workbench-badge px-2 py-1">
-              {projects.length} deck{projects.length !== 1 ? "s" : ""}
-            </span>
-          </div>
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
+    <WorkbenchPage>
+      <WorkbenchTopbar
+        backTo="/"
+        icon={Presentation}
+        context="Creation Workspace"
+        title="Slides"
+        subtitle="Deck library and generation sessions"
+        badge={
+          <WorkbenchStatusPill>
+            {projects.length} deck{projects.length !== 1 ? "s" : ""}
+          </WorkbenchStatusPill>
+        }
+        actions={
+          <>
             <div className="relative min-w-0 max-sm:w-full">
               <Search
                 size={14}
@@ -88,9 +91,9 @@ export function SlidesGalleryPage() {
               <Plus size={14} />
               New Deck
             </button>
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {/* Filter bar */}
       <div className="mx-auto max-w-6xl px-6 py-3 max-sm:px-3">
@@ -117,6 +120,10 @@ export function SlidesGalleryPage() {
 
       {/* Grid */}
       <div className="mx-auto max-w-6xl px-6 py-4 max-sm:px-3">
+        <WorkbenchSectionHeader
+          title="Library"
+          description="Recent decks, generated outputs, and local drafts"
+        />
         {filtered.length === 0 ? (
           <div className="workbench-panel-muted py-20 text-center text-muted">
             <Presentation size={48} className="mx-auto mb-4 opacity-30" />
@@ -175,6 +182,6 @@ export function SlidesGalleryPage() {
           </div>
         )}
       </div>
-    </div>
+    </WorkbenchPage>
   );
 }
