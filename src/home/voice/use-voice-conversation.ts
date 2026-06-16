@@ -24,6 +24,8 @@ export interface VoiceConversation {
   interrupt: () => void;
   /** Whether the camera is on (each spoken turn then attaches a frame). */
   cameraActive: boolean;
+  /** Live camera stream for the self-preview (null when off). */
+  cameraStream: MediaStream | null;
   /** Last camera error (permission denied / no device). */
   cameraError: string | null;
   /** Toggle the camera on/off. */
@@ -127,6 +129,7 @@ export function useVoiceConversation(
   const cameraStop = camera.stop;
   const cameraGrab = camera.grabFrame;
   const cameraActive = camera.active;
+  const cameraStream = camera.stream;
   const cameraError = camera.error;
   const [state, setState] = useState<VoiceState>("idle");
   const [lastAssistantText, setLastAssistantText] = useState("");
@@ -486,6 +489,7 @@ export function useVoiceConversation(
     stop,
     interrupt,
     cameraActive,
+    cameraStream,
     cameraError,
     toggleCamera,
   };

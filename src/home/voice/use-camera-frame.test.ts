@@ -98,4 +98,21 @@ describe("useCameraFrame", () => {
     expect(stopTrack).toHaveBeenCalled();
     expect(result.current.active).toBe(false);
   });
+
+  it("exposes the live stream while active and clears it on stop", async () => {
+    const fakeStream = { getTracks: () => [{ stop: vi.fn() }] };
+    getUserMedia.mockResolvedValue(fakeStream);
+    const { result } = renderHook(() => useCameraFrame());
+
+    expect(result.current.stream).toBeNull();
+    await act(async () => {
+      await result.current.start();
+    });
+    expect(result.current.stream).toBe(fakeStream);
+
+    act(() => {
+      result.current.stop();
+    });
+    expect(result.current.stream).toBeNull();
+  });
 });

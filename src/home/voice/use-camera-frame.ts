@@ -3,6 +3,8 @@ import { useCallback, useRef, useState } from "react";
 export interface CameraFrame {
   /** Whether the camera stream is live. */
   active: boolean;
+  /** Live camera stream, for binding to a preview `<video>`. Null when off. */
+  stream: MediaStream | null;
   /** Last error (permission denied / no device / capture failure). */
   error: string | null;
   /** Request camera access and start the stream. */
@@ -49,13 +51,15 @@ export function useCameraFrame(): CameraFrame {
   const streamRef = useRef<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [active, setActive] = useState(false);
+  // Exposed so a preview <video> can bind the live stream.
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const stop = useCallback(() => {
-    const stream = streamRef.current;
+    const current = streamRef.current;
     streamRef.current = null;
-    if (stream) {
-      for (const track of stream.getTracks()) {
+    if (current) {
+      for (const track of current.getTracks()) {
         try {
           track.stop();
         } catch {
@@ -72,6 +76,7 @@ export function useCameraFrame(): CameraFrame {
       }
     }
     videoRef.current = null;
+    setStream(null);
     setActive(false);
   }, []);
 
@@ -92,6 +97,7 @@ export function useCameraFrame(): CameraFrame {
         // Autoplay may be deferred; frames can still be grabbed once data flows.
       }
       videoRef.current = video;
+      setStream(stream);
       setActive(true);
     } catch (e) {
       console.error("[camera] start failed", e);
@@ -99,6 +105,7 @@ export function useCameraFrame(): CameraFrame {
       setActive(false);
       streamRef.current = null;
       videoRef.current = null;
+      setStream(null);
     }
   }, []);
 
@@ -129,5 +136,5 @@ export function useCameraFrame(): CameraFrame {
     }
   }, []);
 
-  return { active, error, start, stop, grabFrame };
+  return { active, stream, error, start, stop, grabFrame };
 }

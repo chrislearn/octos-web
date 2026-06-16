@@ -3,6 +3,7 @@ import { Camera, CameraOff, X } from "lucide-react";
 import { useVoiceConversation, type VoiceState } from "./use-voice-conversation";
 import { VoiceOrb } from "./voice-orb";
 import { VoiceSelector } from "./voice-selector";
+import { CameraPreview } from "./camera-preview";
 import { unlockAudio } from "./audio-playback";
 import "./voice.css";
 
@@ -55,15 +56,23 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
         {conv.cameraActive ? <Camera size={20} /> : <CameraOff size={20} />}
       </button>
 
+      {/* Self-preview: show the user what the AI sees. */}
+      {conv.cameraActive && conv.cameraStream && (
+        <div className="absolute left-1/2 top-5 flex -translate-x-1/2 flex-col items-center gap-1">
+          <CameraPreview stream={conv.cameraStream} />
+          <span className="text-[10px] text-white/40">AI 看到的画面</span>
+        </div>
+      )}
+
       <div onClick={onOrbClick} role="button" aria-label="voice orb">
         <VoiceOrb state={conv.state} />
       </div>
 
       <div className="mt-6 min-h-[20px] text-sm text-white/55">{STATE_WORD[conv.state]}</div>
 
-      {/* MVP: status indicator only — no self-preview. */}
-      {conv.cameraActive && (
-        <div className="mt-1 text-xs text-white/40">摄像头开启中</div>
+      {/* Camera on but stream not ready yet, or it failed. */}
+      {conv.cameraActive && !conv.cameraStream && (
+        <div className="mt-1 text-xs text-white/40">摄像头开启中…</div>
       )}
       {conv.cameraError && (
         <div className="mt-1 text-xs text-red-300/70">摄像头不可用，已切回纯语音</div>
