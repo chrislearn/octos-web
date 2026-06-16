@@ -301,13 +301,18 @@ export function LlmTab({ profile, onProfileUpdated }: LlmTabProps) {
       const baseUrl = needsBaseUrl
         ? form.base_url.trim()
         : selectedProvider?.defaultBaseUrl;
+      // For a JSON-credential provider, test the freshly-pasted JSON directly
+      // (it isn't saved yet). Blank → omit so the backend resolves the saved
+      // keychain value. Non-JSON providers test the saved api_key_env.
+      const jsonCred = isJsonCredential ? form.sa_json.trim() : "";
+      const apiKey = jsonCred || (envKey ? undefined : "not-required");
       const resp = await request<{ ok: boolean; message?: string; error?: string }>("/api/my/test-provider", {
         method: "POST",
         body: JSON.stringify({
           provider: effectiveFamilyId,
           model: effectiveModelId,
           api_key_env: envKey || undefined,
-          api_key: envKey ? undefined : "not-required",
+          api_key: apiKey,
           base_url: baseUrl || undefined,
           profile_id: profile.id,
         }),
