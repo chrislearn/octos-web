@@ -56,11 +56,35 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
         {conv.cameraActive ? <Camera size={20} /> : <CameraOff size={20} />}
       </button>
 
-      {/* Self-preview: show the user what the AI sees. */}
+      {/* Self-preview: show the user what the AI sees (continuous live feed). */}
       {conv.cameraActive && conv.cameraStream && (
         <div className="absolute left-1/2 top-5 flex -translate-x-1/2 flex-col items-center gap-1">
-          <CameraPreview stream={conv.cameraStream} />
-          <span className="text-[10px] text-white/40">AI 看到的画面</span>
+          <div className="relative">
+            <CameraPreview stream={conv.cameraStream} />
+            {/* One-shot border flash each time a frame is sent (keyed by URL). */}
+            {conv.lastSentFrameUrl && (
+              <span
+                key={conv.lastSentFrameUrl}
+                className="cam-sent-flash pointer-events-none absolute inset-0 rounded-xl"
+              />
+            )}
+          </div>
+          <span className="text-[10px] text-white/40">实时画面</span>
+        </div>
+      )}
+
+      {/* The exact frame sent to the AI this turn (model's view, not mirrored). */}
+      {conv.lastSentFrameUrl && (
+        <div
+          key={conv.lastSentFrameUrl}
+          className="cam-sent-pop absolute bottom-4 left-4 flex flex-col items-center gap-1"
+        >
+          <img
+            src={conv.lastSentFrameUrl}
+            alt="frame sent to AI"
+            className="h-20 w-[107px] rounded-lg object-cover ring-1 ring-white/15 shadow-lg"
+          />
+          <span className="text-[10px] text-white/40">已发给 AI</span>
         </div>
       )}
 

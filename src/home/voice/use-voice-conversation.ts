@@ -26,6 +26,10 @@ export interface VoiceConversation {
   cameraActive: boolean;
   /** Live camera stream for the self-preview (null when off). */
   cameraStream: MediaStream | null;
+  /** Object URL of the exact frame last sent to the AI (the model's view —
+   *  downscaled, not mirrored). Replaced on the next send, auto-cleared after
+   *  a while. Null when none/expired. */
+  lastSentFrameUrl: string | null;
   /** Last camera error (permission denied / no device). */
   cameraError: string | null;
   /** Toggle the camera on/off. */
@@ -54,6 +58,8 @@ const AUDIO_EXT = /\.(wav|mp3|ogg|m4a|flac)$/i;
  *  under memory pressure (tens of seconds each), so this is deliberately
  *  generous; cloud STT/TTS or more RAM would let us shrink it. */
 const REPLY_TIMEOUT_MS = 90000;
+/** How long the "frame sent to the AI" thumbnail lingers before auto-hiding. */
+const SENT_FRAME_TTL_MS = 12000;
 const LISTENING_VAD_OPTIONS = {
   positiveSpeechThreshold: 0.5,
   negativeSpeechThreshold: 0.35,
@@ -137,6 +143,36 @@ export function useVoiceConversation(
   const cameraActiveRef = useRef(false);
   cameraActiveRef.current = cameraActive;
 
+  // The exact frame last sent to the AI, as an object URL (for the bottom
+  // thumbnail). We own the URL's lifetime: revoke on replace / hide / unmount.
+  const [lastSentFrameUrl, setLastSentFrameUrl] = useState<string | null>(null);
+  const lastSentFrameUrlRef = useRef<string | null>(null);
+  const sentFrameTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const clearSentFrame = useCallback(() => {
+    clearTimeout(sentFrameTimerRef.current);
+    if (lastSentFrameUrlRef.current) {
+      URL.revokeObjectURL(lastSentFrameUrlRef.current);
+      lastSentFrameUrlRef.current = null;
+    }
+    setLastSentFrameUrl(null);
+  }, []);
+
+  const showSentFrame = useCallback(
+    (frame: File) => {
+      if (typeof URL.createObjectURL !== "function") return;
+      clearTimeout(sentFrameTimerRef.current);
+      if (lastSentFrameUrlRef.current) {
+        URL.revokeObjectURL(lastSentFrameUrlRef.current);
+      }
+      const url = URL.createObjectURL(frame);
+      lastSentFrameUrlRef.current = url;
+      setLastSentFrameUrl(url);
+      sentFrameTimerRef.current = setTimeout(clearSentFrame, SENT_FRAME_TTL_MS);
+    },
+    [clearSentFrame],
+  );
+
   const playedPathsRef = useRef<Set<string>>(new Set());
   const ignoredTurnIdsRef = useRef<Set<string>>(new Set());
   const activeTurnIdRef = useRef<string | null>(null);
@@ -213,6 +249,9 @@ export function useVoiceConversation(
           cameraActiveRef.current,
           cameraGrab,
         );
+        // Surface the exact image sent to the AI (the model's view).
+        const sentFrame = files.find((f) => f.type.startsWith("image/"));
+        if (sentFrame) showSentFrame(sentFrame);
         const paths = await uploadFiles(files, "recording");
         // The server-side STT transcribes the audio in `media` into the prompt.
         // The reply's TTS audio arrives asynchronously and is played by the
@@ -242,7 +281,7 @@ export function useVoiceConversation(
         setState("error");
       }
     },
-    [historyTopic, sessionId, cameraGrab],
+    [historyTopic, sessionId, cameraGrab, showSentFrame],
   );
 
   const beginThinkingInterrupt = useCallback(async () => {
@@ -402,10 +441,11 @@ export function useVoiceConversation(
     playingRef.current = false;
     void captureStop();
     cameraStop();
+    clearSentFrame();
     releaseAudio();
     stateRef.current = "idle";
     setState("idle");
-  }, [captureStop, cameraStop, releaseAudio]);
+  }, [captureStop, cameraStop, clearSentFrame, releaseAudio]);
 
   const toggleCamera = useCallback(() => {
     if (cameraActiveRef.current) {
@@ -490,6 +530,7 @@ export function useVoiceConversation(
     interrupt,
     cameraActive,
     cameraStream,
+    lastSentFrameUrl,
     cameraError,
     toggleCamera,
   };

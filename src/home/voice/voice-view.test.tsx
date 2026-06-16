@@ -7,6 +7,7 @@ const conversationMock = vi.hoisted(() => ({
   state: "idle" as VoiceConversation["state"],
   cameraActive: false,
   cameraStream: null as MediaStream | null,
+  lastSentFrameUrl: null as string | null,
   start: vi.fn(),
   stop: vi.fn(),
   interrupt: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock("./use-voice-conversation", () => ({
     interrupt: conversationMock.interrupt,
     cameraActive: conversationMock.cameraActive,
     cameraStream: conversationMock.cameraStream,
+    lastSentFrameUrl: conversationMock.lastSentFrameUrl,
     cameraError: null,
     toggleCamera: conversationMock.toggleCamera,
   }),
@@ -53,6 +55,7 @@ describe("VoiceView", () => {
     conversationMock.state = "idle";
     conversationMock.cameraActive = false;
     conversationMock.cameraStream = null;
+    conversationMock.lastSentFrameUrl = null;
     conversationMock.start.mockReset();
     conversationMock.stop.mockReset();
     conversationMock.interrupt.mockReset();
@@ -94,7 +97,7 @@ describe("VoiceView", () => {
     render(<VoiceView sessionId="voice-test" onBack={vi.fn()} />);
 
     expect(screen.getByTestId("camera-preview")).toBeTruthy();
-    expect(screen.getByText("AI 看到的画面")).toBeTruthy();
+    expect(screen.getByText("实时画面")).toBeTruthy();
     // starting indicator gone once the stream is present
     expect(screen.queryByText("摄像头开启中…")).toBeNull();
   });
@@ -104,5 +107,21 @@ describe("VoiceView", () => {
     render(<VoiceView sessionId="voice-test" onBack={vi.fn()} />);
 
     expect(screen.queryByTestId("camera-preview")).toBeNull();
+  });
+
+  it("shows the frame sent to the AI when a frame URL is present", () => {
+    conversationMock.lastSentFrameUrl = "blob:fake-frame";
+    render(<VoiceView sessionId="voice-test" onBack={vi.fn()} />);
+
+    const img = screen.getByAltText("frame sent to AI") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("blob:fake-frame");
+    expect(screen.getByText("已发给 AI")).toBeTruthy();
+  });
+
+  it("hides the sent-frame thumbnail when there is none", () => {
+    conversationMock.lastSentFrameUrl = null;
+    render(<VoiceView sessionId="voice-test" onBack={vi.fn()} />);
+
+    expect(screen.queryByAltText("frame sent to AI")).toBeNull();
   });
 });
