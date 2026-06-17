@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { X } from "lucide-react";
+import { Camera, CameraOff, X } from "lucide-react";
 import { useVoiceConversation, type VoiceState } from "./use-voice-conversation";
 import { VoiceOrb } from "./voice-orb";
 import { VoiceSelector } from "./voice-selector";
+import { CameraPreview } from "./camera-preview";
 import { VisualPanel } from "./visual-panel";
 import { unlockAudio } from "./audio-playback";
 import "./voice.css";
@@ -39,9 +40,9 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
 
   return (
     <div className="voice-view relative flex h-full w-full bg-black">
-      {/* Conversation column. Takes the full width on its own; shrinks to the
-          left when a visual is docked on the right so the user can keep talking
-          while referencing it. */}
+      {/* Conversation column (orb + camera UI + text). Full width on its own;
+          shrinks to the left when a visual is docked on the right so the user
+          can keep talking while referencing it. */}
       <div className="relative flex flex-1 flex-col items-center justify-center min-w-0">
         <button
           onClick={onBack}
@@ -51,11 +52,60 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
           <X size={22} />
         </button>
 
+        <button
+          onClick={() => conv.toggleCamera()}
+          aria-label="toggle camera"
+          aria-pressed={conv.cameraActive}
+          className="absolute left-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/70"
+        >
+          {conv.cameraActive ? <Camera size={20} /> : <CameraOff size={20} />}
+        </button>
+
+        {/* Self-preview: show the user what the AI sees (continuous live feed). */}
+        {conv.cameraActive && conv.cameraStream && (
+          <div className="absolute left-1/2 top-5 flex -translate-x-1/2 flex-col items-center gap-1">
+            <div className="relative">
+              <CameraPreview stream={conv.cameraStream} />
+              {/* One-shot border flash each time a frame is sent (keyed by URL). */}
+              {conv.lastSentFrameUrl && (
+                <span
+                  key={conv.lastSentFrameUrl}
+                  className="cam-sent-flash pointer-events-none absolute inset-0 rounded-xl"
+                />
+              )}
+            </div>
+            <span className="text-[10px] text-white/40">实时画面</span>
+          </div>
+        )}
+
+        {/* The exact frame sent to the AI this turn (model's view, not mirrored). */}
+        {conv.lastSentFrameUrl && (
+          <div
+            key={conv.lastSentFrameUrl}
+            className="cam-sent-pop absolute bottom-4 left-4 flex flex-col items-center gap-1"
+          >
+            <img
+              src={conv.lastSentFrameUrl}
+              alt="frame sent to AI"
+              className="h-20 w-[107px] rounded-lg object-cover ring-1 ring-white/15 shadow-lg"
+            />
+            <span className="text-[10px] text-white/40">已发给 AI</span>
+          </div>
+        )}
+
         <div onClick={onOrbClick} role="button" aria-label="voice orb">
           <VoiceOrb state={conv.state} />
         </div>
 
         <div className="mt-6 min-h-[20px] text-sm text-white/55">{STATE_WORD[conv.state]}</div>
+
+        {/* Camera on but stream not ready yet, or it failed. */}
+        {conv.cameraActive && !conv.cameraStream && (
+          <div className="mt-1 text-xs text-white/40">摄像头开启中…</div>
+        )}
+        {conv.cameraError && (
+          <div className="mt-1 text-xs text-red-300/70">摄像头不可用，已切回纯语音</div>
+        )}
 
         <div className="mt-4 max-w-[80%] text-center">
           {conv.lastUserText && (

@@ -27,3 +27,17 @@
   70%{opacity:.18}
   100%{transform:scale(1.92);opacity:0}
 }
+
+/* Camera capture feedback: a one-shot border flash on the live preview when a
+   frame is sent to the AI, and a pop-in for the sent-frame thumbnail. Replayed
+   on each send via a changing React `key`. */
+.cam-sent-flash { animation: cam-flash .5s ease-out 1; }
+@keyframes cam-flash {
+  0%{opacity:1;box-shadow:0 0 0 2px rgba(196,116,69,.9),0 0 16px 2px rgba(196,116,69,.6)}
+  100%{opacity:0;box-shadow:0 0 0 2px rgba(196,116,69,0)}
+}
+.cam-sent-pop { animation: cam-pop .24s ease-out 1; }
+@keyframes cam-pop {
+  0%{transform:translateY(8px) scale(.94);opacity:0}
+  100%{transform:none;opacity:1}
+}

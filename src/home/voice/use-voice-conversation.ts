@@ -9,17 +9,10 @@ import { useThreads, type Thread, type ThreadMessage } from "@/store/thread-stor
 import { buildFileUrl } from "@/api/files";
 import { buildApiHeaders } from "@/api/client";
 import { useVoiceCapture } from "./use-voice-capture";
+import { useCameraFrame } from "./use-camera-frame";
 import { playAudioBlob, stopAudio, unlockAudio } from "./audio-playback";
 
 export type VoiceState = "idle" | "listening" | "thinking" | "speaking" | "error";
-
-/** A rich-output artifact the assistant produced for this voice turn. */
-export type VisualKind = "html" | "image";
-export interface VisualArtifact {
-  /** Workspace-relative path, fetched via /api/files (session-scoped). */
-  path: string;
-  kind: VisualKind;
-}
 
 export interface VoiceConversation {
   state: VoiceState;
@@ -29,6 +22,18 @@ export interface VoiceConversation {
   start: () => Promise<void>;
   stop: () => void;
   interrupt: () => void;
+  /** Whether the camera is on (each spoken turn then attaches a frame). */
+  cameraActive: boolean;
+  /** Live camera stream for the self-preview (null when off). */
+  cameraStream: MediaStream | null;
+  /** Object URL of the exact frame last sent to the AI (the model's view —
+   *  downscaled, not mirrored). Replaced on the next send, auto-cleared after
+   *  a while. Null when none/expired. */
+  lastSentFrameUrl: string | null;
+  /** Last camera error (permission denied / no device). */
+  cameraError: string | null;
+  /** Toggle the camera on/off. */
+  toggleCamera: () => void;
   /** The latest rich-output artifact (image/HTML) to render, or null. */
   visual: VisualArtifact | null;
   /** True while a visual is being generated (marker seen, artifact not yet in). */
@@ -37,55 +42,38 @@ export interface VoiceConversation {
   dismissVisual: () => void;
 }
 
+/** A rich-output artifact the assistant produced for this voice turn. */
+export type VisualKind = "html" | "image";
+export interface VisualArtifact {
+  /** Workspace-relative path, fetched via /api/files (session-scoped). */
+  path: string;
+  kind: VisualKind;
+}
+
+/**
+ * Assemble the files for one spoken turn: always the audio, plus a camera frame
+ * when the camera is on and a frame is available. A failed/empty grab degrades
+ * to audio-only so the turn still goes through. Exported for unit tests.
+ */
+export async function assembleTurnFiles(
+  audio: File,
+  cameraActive: boolean,
+  grabFrame: () => Promise<File | null>,
+): Promise<File[]> {
+  if (!cameraActive) return [audio];
+  const frame = await grabFrame();
+  return frame ? [audio, frame] : [audio];
+}
+
 const AUDIO_EXT = /\.(wav|mp3|ogg|m4a|flac)$/i;
-const HTML_EXT = /\.html?$/i;
-const VISUAL_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
-/** Mirror of the backend in-band marker `[[VISUAL:kind|brief]]`. */
-const VISUAL_MARKER = /\[\[VISUAL:(html|image|infographic)\|([^\]]*)\]\]/;
-/** Safety net: clear the "generating" state if no artifact arrives in time. */
-const VISUAL_TIMEOUT_MS = 90000;
-
-/** Whether the assistant reply carries an in-band visual marker. */
-export function hasVisualMarker(text: string): boolean {
-  const m = VISUAL_MARKER.exec(text);
-  return m !== null && m[2].trim().length > 0;
-}
-
-/** Strip a trailing `[[VISUAL:...]]` marker so it isn't shown to the user. */
-export function stripVisualMarker(text: string): string {
-  const i = text.indexOf("[[VISUAL:");
-  return i >= 0 ? text.slice(0, i).trimEnd() : text;
-}
-
-/** Collect ALL unseen assistant visual artifacts (image/HTML) in order. */
-export function collectFreshVisuals(
-  threads: Thread[],
-  seen: Set<string>,
-  ignoredThreadIds: Set<string> = new Set(),
-): VisualArtifact[] {
-  const out: VisualArtifact[] = [];
-  for (let i = 0; i < threads.length; i++) {
-    if (ignoredThreadIds.has(threads[i].id)) continue;
-    const asst = threads[i].responses.filter(
-      (m: ThreadMessage) => m.role === "assistant",
-    );
-    for (let j = 0; j < asst.length; j++) {
-      for (const f of asst[j].files) {
-        if (seen.has(f.path)) continue;
-        if (HTML_EXT.test(f.path)) out.push({ path: f.path, kind: "html" });
-        else if (VISUAL_IMAGE_EXT.test(f.path))
-          out.push({ path: f.path, kind: "image" });
-      }
-    }
-  }
-  return out;
-}
 
 /** Safety net: if no reply audio shows up within this window after sending,
  *  return to listening. On-device ominix can thrash ASR↔TTS model reloads
  *  under memory pressure (tens of seconds each), so this is deliberately
  *  generous; cloud STT/TTS or more RAM would let us shrink it. */
 const REPLY_TIMEOUT_MS = 90000;
+/** How long the "frame sent to the AI" thumbnail lingers before auto-hiding. */
+const SENT_FRAME_TTL_MS = 12000;
 const LISTENING_VAD_OPTIONS = {
   positiveSpeechThreshold: 0.5,
   negativeSpeechThreshold: 0.35,
@@ -142,6 +130,49 @@ export function collectFreshAudio(
   return out;
 }
 
+const HTML_EXT = /\.html?$/i;
+const VISUAL_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
+/** Mirror of the backend in-band marker `[[VISUAL:kind|brief]]`. */
+const VISUAL_MARKER = /\[\[VISUAL:(html|image|infographic)\|([^\]]*)\]\]/;
+/** Safety net: clear the "generating" state if no artifact arrives in time. */
+const VISUAL_TIMEOUT_MS = 90000;
+
+/** Whether the assistant reply carries an in-band visual marker. */
+export function hasVisualMarker(text: string): boolean {
+  const m = VISUAL_MARKER.exec(text);
+  return m !== null && m[2].trim().length > 0;
+}
+
+/** Strip a trailing `[[VISUAL:...]]` marker so it isn't shown to the user. */
+export function stripVisualMarker(text: string): string {
+  const i = text.indexOf("[[VISUAL:");
+  return i >= 0 ? text.slice(0, i).trimEnd() : text;
+}
+
+/** Collect ALL unseen assistant visual artifacts (image/HTML) in order. */
+export function collectFreshVisuals(
+  threads: Thread[],
+  seen: Set<string>,
+  ignoredThreadIds: Set<string> = new Set(),
+): VisualArtifact[] {
+  const out: VisualArtifact[] = [];
+  for (let i = 0; i < threads.length; i++) {
+    if (ignoredThreadIds.has(threads[i].id)) continue;
+    const asst = threads[i].responses.filter(
+      (m: ThreadMessage) => m.role === "assistant",
+    );
+    for (let j = 0; j < asst.length; j++) {
+      for (const f of asst[j].files) {
+        if (seen.has(f.path)) continue;
+        if (HTML_EXT.test(f.path)) out.push({ path: f.path, kind: "html" });
+        else if (VISUAL_IMAGE_EXT.test(f.path))
+          out.push({ path: f.path, kind: "image" });
+      }
+    }
+  }
+  return out;
+}
+
 export function useVoiceConversation(
   sessionId: string,
   historyTopic?: string,
@@ -155,6 +186,14 @@ export function useVoiceConversation(
   const captureStart = capture.start;
   const captureStop = capture.stop;
   const captureError = capture.error;
+  const camera = useCameraFrame();
+  // Stable fns (useCallback([])); the object identity churns each render.
+  const cameraStart = camera.start;
+  const cameraStop = camera.stop;
+  const cameraGrab = camera.grabFrame;
+  const cameraActive = camera.active;
+  const cameraStream = camera.stream;
+  const cameraError = camera.error;
   const [state, setState] = useState<VoiceState>("idle");
   const [lastAssistantText, setLastAssistantText] = useState("");
   const [visual, setVisual] = useState<VisualArtifact | null>(null);
@@ -166,6 +205,40 @@ export function useVoiceConversation(
   const seenVisualsRef = useRef<Set<string>>(new Set());
   const generatingKeyRef = useRef<string | null>(null);
   const generatingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Read camera-on inside the stable send callback without re-creating it.
+  const cameraActiveRef = useRef(false);
+  cameraActiveRef.current = cameraActive;
+
+  // The exact frame last sent to the AI, as an object URL (for the bottom
+  // thumbnail). We own the URL's lifetime: revoke on replace / hide / unmount.
+  const [lastSentFrameUrl, setLastSentFrameUrl] = useState<string | null>(null);
+  const lastSentFrameUrlRef = useRef<string | null>(null);
+  const sentFrameTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const clearSentFrame = useCallback(() => {
+    clearTimeout(sentFrameTimerRef.current);
+    if (lastSentFrameUrlRef.current) {
+      URL.revokeObjectURL(lastSentFrameUrlRef.current);
+      lastSentFrameUrlRef.current = null;
+    }
+    setLastSentFrameUrl(null);
+  }, []);
+
+  const showSentFrame = useCallback(
+    (frame: File) => {
+      if (typeof URL.createObjectURL !== "function") return;
+      clearTimeout(sentFrameTimerRef.current);
+      if (lastSentFrameUrlRef.current) {
+        URL.revokeObjectURL(lastSentFrameUrlRef.current);
+      }
+      const url = URL.createObjectURL(frame);
+      lastSentFrameUrlRef.current = url;
+      setLastSentFrameUrl(url);
+      sentFrameTimerRef.current = setTimeout(clearSentFrame, SENT_FRAME_TTL_MS);
+    },
+    [clearSentFrame],
+  );
 
   const playedPathsRef = useRef<Set<string>>(new Set());
   const ignoredTurnIdsRef = useRef<Set<string>>(new Set());
@@ -235,10 +308,21 @@ export function useVoiceConversation(
         stateRef.current = "thinking";
         setState("thinking");
         const file = new File([wav], "utterance.wav", { type: "audio/wav" });
-        const paths = await uploadFiles([file], "recording");
-        // Audio-only turn: the server-side STT transcribes `media` into the
-        // prompt. The reply's TTS audio arrives asynchronously and is played
-        // by the threads watcher below (not here in onComplete).
+        // When the camera is on, attach the current frame so the turn is a
+        // video call (audio + image); the server transcribes the audio and the
+        // VLM sees the frame. Degrades to audio-only on a failed grab.
+        const files = await assembleTurnFiles(
+          file,
+          cameraActiveRef.current,
+          cameraGrab,
+        );
+        // Surface the exact image sent to the AI (the model's view).
+        const sentFrame = files.find((f) => f.type.startsWith("image/"));
+        if (sentFrame) showSentFrame(sentFrame);
+        const paths = await uploadFiles(files, "recording");
+        // The server-side STT transcribes the audio in `media` into the prompt.
+        // The reply's TTS audio arrives asynchronously and is played by the
+        // threads watcher below (not here in onComplete).
         sendMessage({
           sessionId,
           historyTopic,
@@ -264,7 +348,7 @@ export function useVoiceConversation(
         setState("error");
       }
     },
-    [historyTopic, sessionId],
+    [historyTopic, sessionId, cameraGrab, showSentFrame],
   );
 
   const beginThinkingInterrupt = useCallback(async () => {
@@ -440,10 +524,20 @@ export function useVoiceConversation(
     setVisual(null);
     setGenerating(false);
     void captureStop();
+    cameraStop();
+    clearSentFrame();
     releaseAudio();
     stateRef.current = "idle";
     setState("idle");
-  }, [captureStop, releaseAudio]);
+  }, [captureStop, cameraStop, clearSentFrame, releaseAudio]);
+
+  const toggleCamera = useCallback(() => {
+    if (cameraActiveRef.current) {
+      cameraStop();
+    } else {
+      void cameraStart();
+    }
+  }, [cameraStart, cameraStop]);
 
   const interrupt = useCallback(() => {
     if (stateRef.current === "speaking") {
@@ -561,6 +655,11 @@ export function useVoiceConversation(
     start,
     stop,
     interrupt,
+    cameraActive,
+    cameraStream,
+    lastSentFrameUrl,
+    cameraError,
+    toggleCamera,
     visual,
     generating,
     dismissVisual,
