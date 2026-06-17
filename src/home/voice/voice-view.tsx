@@ -38,53 +38,61 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
   };
 
   return (
-    <div className="voice-view relative flex h-full w-full flex-col items-center justify-center bg-black">
-      <button
-        onClick={onBack}
-        aria-label="exit voice mode"
-        className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/70"
-      >
-        <X size={22} />
-      </button>
+    <div className="voice-view relative flex h-full w-full bg-black">
+      {/* Conversation column. Takes the full width on its own; shrinks to the
+          left when a visual is docked on the right so the user can keep talking
+          while referencing it. */}
+      <div className="relative flex flex-1 flex-col items-center justify-center min-w-0">
+        <button
+          onClick={onBack}
+          aria-label="exit voice mode"
+          className="absolute right-5 top-5 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white/70"
+        >
+          <X size={22} />
+        </button>
 
-      <div onClick={onOrbClick} role="button" aria-label="voice orb">
-        <VoiceOrb state={conv.state} />
+        <div onClick={onOrbClick} role="button" aria-label="voice orb">
+          <VoiceOrb state={conv.state} />
+        </div>
+
+        <div className="mt-6 min-h-[20px] text-sm text-white/55">{STATE_WORD[conv.state]}</div>
+
+        <div className="mt-4 max-w-[80%] text-center">
+          {conv.lastUserText && (
+            <div className="mb-2 text-sm text-white/45">{conv.lastUserText}</div>
+          )}
+          {conv.lastAssistantText && (
+            <div className="text-lg leading-relaxed text-white/90">{conv.lastAssistantText}</div>
+          )}
+        </div>
+
+        {/* Rich output: generating indicator while the visual is being produced. */}
+        {conv.generating && !conv.visual && (
+          <div className="mt-5 flex items-center gap-2 text-sm text-white/60">
+            <span className="h-2 w-2 animate-ping rounded-full bg-white/70" />
+            正在生成视觉内容…
+          </div>
+        )}
+
+        {/* Quick voice switcher — same store as the settings panel. */}
+        {conv.state !== "idle" && (
+          <div className="absolute inset-x-0 bottom-6 px-6">
+            <VoiceSelector />
+          </div>
+        )}
       </div>
 
-      <div className="mt-6 min-h-[20px] text-sm text-white/55">{STATE_WORD[conv.state]}</div>
-
-      <div className="mt-4 max-w-[80%] text-center">
-        {conv.lastUserText && (
-          <div className="mb-2 text-sm text-white/45">{conv.lastUserText}</div>
-        )}
-        {conv.lastAssistantText && (
-          <div className="text-lg leading-relaxed text-white/90">{conv.lastAssistantText}</div>
-        )}
-      </div>
-
-      {/* Rich output: generating indicator while the visual is being produced. */}
-      {conv.generating && !conv.visual && (
-        <div className="mt-5 flex items-center gap-2 text-sm text-white/60">
-          <span className="h-2 w-2 animate-ping rounded-full bg-white/70" />
-          正在生成视觉内容…
-        </div>
-      )}
-
-      {/* Quick voice switcher — same store as the settings panel. */}
-      {conv.state !== "idle" && !conv.visual && (
-        <div className="absolute inset-x-0 bottom-6 px-6">
-          <VoiceSelector />
-        </div>
-      )}
-
-      {/* Rich output: the produced image / interactive HTML, over the orb. */}
+      {/* Rich output: produced image / interactive HTML, docked on the right so
+          the next turn can be spoken while looking at it. */}
       {conv.visual && (
-        <VisualPanel
-          key={conv.visual.path}
-          visual={conv.visual}
-          sessionId={sessionId}
-          onClose={conv.dismissVisual}
-        />
+        <div className="h-full w-[55%] shrink-0 border-l border-white/10">
+          <VisualPanel
+            key={conv.visual.path}
+            visual={conv.visual}
+            sessionId={sessionId}
+            onClose={conv.dismissVisual}
+          />
+        </div>
       )}
     </div>
   );

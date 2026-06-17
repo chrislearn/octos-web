@@ -11,7 +11,9 @@ interface VisualPanelProps {
 }
 
 /**
- * Renders a voice-turn rich-output artifact over the orb.
+ * Renders a voice-turn rich-output artifact. Fills its container, which the
+ * voice view docks on the right so the next turn can be spoken while looking
+ * at it.
  *
  * - HTML → a **sandboxed iframe** (`sandbox="allow-scripts"`, no
  *   `allow-same-origin`) via `srcDoc`, so interactive demos run their own JS
@@ -57,7 +59,7 @@ export function VisualPanel({ visual, sessionId, onClose }: VisualPanelProps) {
   }, [visual.path, visual.kind, sessionId]);
 
   return (
-    <div className="absolute inset-0 z-20 flex flex-col bg-black/85 p-4 backdrop-blur-sm">
+    <div className="relative flex h-full w-full flex-col bg-black/40 p-4">
       <button
         onClick={onClose}
         aria-label="close visual"
