@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useVoiceConversation, type VoiceState } from "./use-voice-conversation";
 import { VoiceOrb } from "./voice-orb";
 import { VoiceSelector } from "./voice-selector";
+import { VisualPanel } from "./visual-panel";
 import { unlockAudio } from "./audio-playback";
 import "./voice.css";
 
@@ -61,11 +62,29 @@ export function VoiceView({ sessionId, historyTopic, onBack }: VoiceViewProps) {
         )}
       </div>
 
+      {/* Rich output: generating indicator while the visual is being produced. */}
+      {conv.generating && !conv.visual && (
+        <div className="mt-5 flex items-center gap-2 text-sm text-white/60">
+          <span className="h-2 w-2 animate-ping rounded-full bg-white/70" />
+          正在生成视觉内容…
+        </div>
+      )}
+
       {/* Quick voice switcher — same store as the settings panel. */}
-      {conv.state !== "idle" && (
+      {conv.state !== "idle" && !conv.visual && (
         <div className="absolute inset-x-0 bottom-6 px-6">
           <VoiceSelector />
         </div>
+      )}
+
+      {/* Rich output: the produced image / interactive HTML, over the orb. */}
+      {conv.visual && (
+        <VisualPanel
+          key={conv.visual.path}
+          visual={conv.visual}
+          sessionId={sessionId}
+          onClose={conv.dismissVisual}
+        />
       )}
     </div>
   );
