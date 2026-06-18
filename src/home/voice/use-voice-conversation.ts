@@ -606,7 +606,11 @@ export function useVoiceConversation(
       for (const v of fresh) seenVisualsRef.current.add(v.path);
       setVisual(fresh[fresh.length - 1]);
       setGenerating(false);
-      generatingKeyRef.current = null;
+      // Keep generatingKeyRef pointing at the just-satisfied marker (do NOT
+      // null it): the completed turn's marker text is still the newest in
+      // `threads`, so nulling here would let the scan below immediately
+      // re-enter the generating state on that stale marker. A genuinely new
+      // turn carries different marker text and still flags correctly.
       clearTimeout(generatingTimerRef.current);
       return;
     }
