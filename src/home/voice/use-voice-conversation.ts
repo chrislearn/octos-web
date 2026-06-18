@@ -133,7 +133,7 @@ export function collectFreshAudio(
 const HTML_EXT = /\.html?$/i;
 const VISUAL_IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
 /** Mirror of the backend in-band marker `[[VISUAL:kind|brief]]`. */
-const VISUAL_MARKER = /\[\[VISUAL:(html|image|infographic)\|([^\]]*)\]\]/;
+const VISUAL_MARKER = /\[\[VISUAL:(html|illustrated|image|infographic)\|([^\]]*)\]\]/;
 /** Safety net: clear the "generating" state if no artifact arrives in time. */
 const VISUAL_TIMEOUT_MS = 90000;
 
