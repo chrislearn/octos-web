@@ -938,6 +938,51 @@ test.describe("Settings page — tab smoke tests", () => {
     );
   });
 
+  test("Channels tab can add a Cokret account channel", async ({ page }) => {
+    const mocks = await installServerSettingsMocks(page);
+    await seedAdminSession(page);
+
+    await page.goto("/settings", { waitUntil: "networkidle" });
+    await expect(page.locator(".animate-spin")).toBeHidden({ timeout: TIMEOUT });
+    await clickTab(page, "Channels");
+
+    await page.getByRole("button", { name: /^Add Channel$/ }).first().click();
+    const form = page.locator(".glass-section", { hasText: "New Channel" });
+    await form.locator("select").first().selectOption("cokret");
+    await form.getByPlaceholder("https://cokret.example.org").fill("https://cokret.local");
+    await form.getByPlaceholder("did:webvh:cokret.example.org").fill("did:webvh:cokret.local");
+    await form
+      .getByPlaceholder("did:web:bot.example", { exact: true })
+      .fill("did:web:octos-bot.local");
+    await form.getByPlaceholder("octos-device").fill("octos-web-device");
+    await form.getByPlaceholder("ck.session.grant").fill("ck-session-grant");
+    await form.getByPlaceholder("ck:realm:...").fill("ck:realm:test");
+    await form.getByLabel("Send outbound replies").check();
+    await form.getByRole("button", { name: /^Add Channel$/ }).click();
+
+    await expect
+      .poll(() => mocks.getProfileUpdateBodies().at(-1))
+      .not.toBeUndefined();
+    const body = mocks.getProfileUpdateBodies().at(-1);
+    const config = (body as { config?: { channels?: unknown[] } }).config;
+    expect(config?.channels).toContainEqual(
+      expect.objectContaining({
+        type: "cokret",
+        enabled: true,
+        mode: "account",
+        id: "cokret-account",
+        base_url: "https://cokret.local",
+        service_did: "did:webvh:cokret.local",
+        principal_id: "did:web:octos-bot.local",
+        device_id: "octos-web-device",
+        access_token: "ck-session-grant",
+        default_realm_id: "ck:realm:test",
+        listen: true,
+        send: true,
+      }),
+    );
+  });
+
   test("Sandbox tab renders configuration section", async ({ page }) => {
     await goToSettings(page);
     const profileLoaded = await hasProfile(page);

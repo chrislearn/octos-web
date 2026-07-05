@@ -44,16 +44,29 @@ const CHANNEL_TYPES = [
   "twilio",
   "api",
   "matrix",
+  "cokret",
   "wechat",
   "wecom-bot",
   "qq-bot",
 ] as const;
 type ChannelType = (typeof CHANNEL_TYPES)[number];
 
+interface CokretNamespacePattern {
+  pattern: string;
+  exclusive?: boolean;
+}
+
+interface CokretNamespaces {
+  actors?: CokretNamespacePattern[];
+  realms?: CokretNamespacePattern[];
+  handles?: CokretNamespacePattern[];
+}
+
 interface ChannelConfig {
   type: string;
-  mode?: "websocket" | "webhook" | "managed" | "external" | "appservice" | "user";
+  mode?: "websocket" | "webhook" | "managed" | "external" | "appservice" | "user" | "account" | "applet";
   enabled?: boolean;
+  id?: string;
   token_env?: string;
   webhook_port?: number;
   allowed_senders?: string | string[];
@@ -86,6 +99,7 @@ interface ChannelConfig {
   client_secret_env?: string;
   bridge_url?: string;
   base_url?: string;
+  service_did?: string;
   // Matrix user-account (client) mode
   user_id?: string;
   access_token?: string;
@@ -95,6 +109,36 @@ interface ChannelConfig {
   auto_join?: "off" | "allowlist" | "always";
   auto_join_allowlist?: string | string[];
   group_policy?: "open" | "allowlist" | "disabled";
+  // Cokret account/applet mode
+  principal_id?: string;
+  device_id?: string;
+  default_realm_id?: string;
+  default_flow_id?: string;
+  agent_id?: string;
+  listen?: boolean;
+  send?: boolean;
+  scopes?: string | string[];
+  cokret_server_did?: string;
+  login_challenge?: string;
+  verification_method?: string;
+  grant_event_path?: string;
+  applet_id?: string;
+  controller_did?: string;
+  bot_actor_id?: string;
+  cokret_server_url?: string;
+  protocols?: string | string[];
+  requested_scopes?: string | string[];
+  ghost_did_prefix?: string;
+  receive_events?: boolean;
+  receive_ephemeral?: boolean;
+  rate_limited?: boolean;
+  authorization_grant_id?: string;
+  registration_epoch?: string;
+  bind_addr?: string;
+  namespaces?: CokretNamespaces;
+  namespace_actors?: string;
+  namespace_realms?: string;
+  namespace_handles?: string;
 }
 
 // ── Default field values per channel type ──
@@ -149,6 +193,20 @@ function defaultsForType(type: ChannelType): Partial<ChannelConfig> {
         group_policy: "allowlist",
         require_mention: true,
       };
+    case "cokret":
+      return {
+        mode: "account",
+        id: "cokret-account",
+        base_url: "",
+        service_did: "",
+        principal_id: "",
+        device_id: "octos-device",
+        access_token: "",
+        default_realm_id: "",
+        default_flow_id: "",
+        listen: true,
+        send: false,
+      };
     case "wechat":
       return { token_env: "WECHAT_BOT_TOKEN", base_url: "https://api.weixin.qq.com/cgi-bin" };
     case "wecom-bot":
@@ -171,6 +229,7 @@ function channelLabel(type: string): string {
     twilio: "Twilio SMS",
     api: "Local API",
     matrix: "Matrix",
+    cokret: "Cokret",
     wechat: "WeChat",
     "wecom-bot": "WeCom Bot",
     "qq-bot": "QQ Bot",
@@ -202,14 +261,86 @@ function webhookUrl(channelType: string, profileId: string): string {
   return `${origin}/webhook/${channelType}/${profileId}`;
 }
 
+function splitConfigList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value
+      .flatMap((entry) => splitConfigList(entry))
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return String(value ?? "")
+    .split(/[,\n]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function namespacePatternsFromText(value: unknown): CokretNamespacePattern[] {
+  return splitConfigList(value).map((pattern) => ({ pattern }));
+}
+
+function namespacePatternsToText(value: unknown): string {
+  if (!Array.isArray(value)) return "";
+  return value
+    .map((entry) => {
+      if (typeof entry === "string") return entry;
+      if (entry && typeof entry === "object" && "pattern" in entry) {
+        return String((entry as CokretNamespacePattern).pattern ?? "");
+      }
+      return "";
+    })
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
+function withCokretDerivedFields(channel: ChannelConfig): ChannelConfig {
+  if (channel.type !== "cokret") return channel;
+  return {
+    ...channel,
+    namespace_actors:
+      channel.namespace_actors ?? namespacePatternsToText(channel.namespaces?.actors),
+    namespace_realms:
+      channel.namespace_realms ?? namespacePatternsToText(channel.namespaces?.realms),
+    namespace_handles:
+      channel.namespace_handles ?? namespacePatternsToText(channel.namespaces?.handles),
+  };
+}
+
 function parseChannels(raw: unknown[]): ChannelConfig[] {
   return raw.map((ch) => {
-    if (typeof ch === "object" && ch !== null) return ch as ChannelConfig;
+    if (typeof ch === "object" && ch !== null) return withCokretDerivedFields(ch as ChannelConfig);
     return { type: "unknown" } as ChannelConfig;
   });
 }
 
 function cleanChannelDraft(draft: ChannelConfig): ChannelConfig {
+  if (draft.type === "cokret") {
+    const cleaned: ChannelConfig = {
+      type: draft.type,
+      enabled: draft.enabled ?? true,
+    };
+    const helperKeys = new Set(["namespace_actors", "namespace_realms", "namespace_handles"]);
+    for (const [key, value] of Object.entries(draft)) {
+      if (key === "type" || key === "enabled" || helperKeys.has(key)) continue;
+      if (value !== "" && value != null) {
+        (cleaned as unknown as Record<string, unknown>)[key] = value;
+      }
+    }
+    const namespaces: CokretNamespaces = {
+      actors: namespacePatternsFromText(draft.namespace_actors),
+      realms: namespacePatternsFromText(draft.namespace_realms),
+      handles: namespacePatternsFromText(draft.namespace_handles),
+    };
+    if (
+      namespaces.actors?.length ||
+      namespaces.realms?.length ||
+      namespaces.handles?.length
+    ) {
+      cleaned.namespaces = namespaces;
+    }
+    return cleaned;
+  }
+
   const cleaned: ChannelConfig = {
     type: draft.type,
     enabled: draft.enabled ?? true,
@@ -502,6 +633,105 @@ function ChannelFormFields({
               {field("Sender localpart", "sender_localpart", { placeholder: "octos" })}
               {field("User prefix", "user_prefix", { placeholder: "octos_" })}
               {field("Allowed senders", "allowed_senders", { placeholder: "@user:matrix.example.com, @bot:matrix.example.com" })}
+            </>
+          )}
+        </>
+      );
+    }
+    case "cokret": {
+      const cokretMode = draft.mode === "applet" ? "applet" : "account";
+      const appletEndpoint = draft.base_url
+        ? `${String(draft.base_url).replace(/\/$/, "")}/_cokret/edge/applet/transactions`
+        : "";
+      return (
+        <>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-muted">Mode</label>
+            <div className="relative">
+              <select
+                value={cokretMode}
+                onChange={(e) => {
+                  const mode = e.target.value as "account" | "applet";
+                  onChange({
+                    mode,
+                    id:
+                      mode === "applet" && draft.id === "cokret-account"
+                        ? "cokret-applet"
+                        : draft.id,
+                    receive_events:
+                      mode === "applet" ? draft.receive_events ?? true : draft.receive_events,
+                    rate_limited:
+                      mode === "applet" ? draft.rate_limited ?? true : draft.rate_limited,
+                  });
+                }}
+                className="w-full appearance-none rounded-xl bg-surface-container px-4 py-2.5 pr-10 text-sm text-text outline-none border border-transparent focus:border-accent/30 transition"
+              >
+                <option value="account">Account</option>
+                <option value="applet">Applet</option>
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted"
+              />
+            </div>
+          </div>
+          {field("Channel ID", "id", {
+            placeholder: cokretMode === "applet" ? "cokret-applet" : "cokret-account",
+          })}
+          {cokretMode === "account" ? (
+            <>
+              {field("Cokret server URL", "base_url", { placeholder: "https://cokret.example.org" })}
+              {field("Service DID", "service_did", { placeholder: "did:webvh:cokret.example.org" })}
+              {field("Principal DID", "principal_id", { placeholder: "did:web:bot.example" })}
+              {field("Device ID", "device_id", { placeholder: "octos-device" })}
+              {field("Access token", "access_token", { placeholder: "ck.session.grant", type: "password" })}
+              {field("Default realm ID", "default_realm_id", { placeholder: "ck:realm:..." })}
+              {field("Default flow ID", "default_flow_id", { placeholder: "Optional flow id" })}
+              {field("Agent ID", "agent_id", { placeholder: "Optional agent id" })}
+              {field("Cokret server DID", "cokret_server_did", { placeholder: "Optional DID-proof audience" })}
+              {field("Login challenge", "login_challenge", { placeholder: "Required when using keyRef" })}
+              {field("Verification method", "verification_method", { placeholder: "did:web:bot.example#key-1" })}
+              {field("Grant event path", "grant_event_path", { placeholder: "/var/secrets/cokret/grant.json" })}
+              {field("Scopes", "scopes", { placeholder: "ck.message.create, ck.message.read" })}
+              {checkbox("Listen for inbound events", "listen")}
+              {checkbox("Send outbound replies", "send")}
+            </>
+          ) : (
+            <>
+              {field("Applet ID", "applet_id", { placeholder: "ck:applet:..." })}
+              {field("Service DID", "service_did", { placeholder: "did:web:octos-bridge.example" })}
+              {field("Controller DID", "controller_did", { placeholder: "did:webvh:cokret.example.org" })}
+              {field("Public base URL", "base_url", { placeholder: "https://octos.example.org" })}
+              {appletEndpoint && (
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium text-muted">Applet transactions URL</label>
+                  <input
+                    type="text"
+                    readOnly
+                    value={appletEndpoint}
+                    className="w-full rounded-xl bg-surface-container px-4 py-2.5 text-sm text-text/70 outline-none border border-border/50 select-all"
+                  />
+                </div>
+              )}
+              {field("Bot actor DID", "bot_actor_id", { placeholder: "did:web:octos-bridge.example:bot" })}
+              {field("Cokret server URL", "cokret_server_url", { placeholder: "https://cokret.example.org" })}
+              {field("Cokret server DID", "cokret_server_did", { placeholder: "did:webvh:cokret.example.org" })}
+              {field("Access token", "access_token", { placeholder: "Applet bearer token", type: "password" })}
+              {field("Protocols", "protocols", { placeholder: "slack, discord, octos" })}
+              {field("Actor namespaces", "namespace_actors", { placeholder: "did:web:octos-bridge.example:*" })}
+              {field("Realm namespaces", "namespace_realms", { placeholder: "ck:realm:*" })}
+              {field("Handle namespaces", "namespace_handles", { placeholder: "@octos_*" })}
+              {field("Ghost DID prefix", "ghost_did_prefix", { placeholder: "ghost:" })}
+              {field("Requested scopes", "requested_scopes", { placeholder: "ck.message.create" })}
+              {field("Bind address", "bind_addr", { placeholder: "127.0.0.1:8330" })}
+              {field("Login challenge", "login_challenge", { placeholder: "Required when using keyRef" })}
+              {field("Verification method", "verification_method", { placeholder: "did:web:octos-bridge.example:bot#key-1" })}
+              {field("Grant event path", "grant_event_path", { placeholder: "/var/secrets/cokret/grant.json" })}
+              {field("Authorization grant ID", "authorization_grant_id", { placeholder: "Optional grant event id" })}
+              {field("Registration epoch", "registration_epoch", { placeholder: "Optional registration hash" })}
+              {checkbox("Receive events", "receive_events")}
+              {checkbox("Receive ephemeral events", "receive_ephemeral")}
+              {checkbox("Allow Cokret rate limiting", "rate_limited")}
             </>
           )}
         </>
